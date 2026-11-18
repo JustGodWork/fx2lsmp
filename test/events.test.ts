@@ -146,6 +146,20 @@ describe("FiveM lifecycle events", () => {
     expect(result).toEqual(["Banned:no", "Late:late reason"]);
   });
 
+  it("playerConnecting gets a temporary source that answers identifier natives", async () => {
+    const result = await world.server.eval<(string | number | boolean)[]>(`
+      local seen = {}
+      AddEventHandler('playerConnecting', function(name)
+        local src = source
+        seen = { src, GetPlayerName(src), GetPlayerIdentifierByType(src, 'license'), GetPlayerIdentifierByType(src, 'ip') }
+      end)
+      lsmp.__fire('playerPreConnection', { name = 'Esx', lsmpId = 42, ip = '127.0.0.1', deny = function() end })
+      Wait(50)
+      return { seen[1] >= 65536, seen[2], seen[3], seen[4] }
+    `);
+    expect(result).toEqual([true, "Esx", "license:42", "ip:127.0.0.1"]);
+  });
+
   it("TriggerEvent with a lifecycle name dispatches without emitting", async () => {
     await world.server.eval("TriggerEvent('onResourceStart', 'manual')");
     expect(await world.server.eval("return ENGINE.start")).toBe("manual");

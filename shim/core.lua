@@ -1,6 +1,7 @@
 ---@class FxCompat
 ---@field side 'client'|'server'
 ---@field resource string
+---@field pendingConnections table<integer, FxPendingConnection>
 ---@field null any
 ---@field MARK string
 ---@field SERVER_SOURCE integer

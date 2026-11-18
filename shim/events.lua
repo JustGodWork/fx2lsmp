@@ -35,6 +35,33 @@ do
   }
 
   if side == 'server' then
+    ---@class FxPendingConnection
+    ---@field name string
+    ---@field lsmpId integer?
+    ---@field ip string?
+    ---@field hwid string?
+
+    --- FiveM gives playerConnecting a temporary source (65536 and up) that already answers the identifier natives.
+    --- LS:MP has no player id before admission, so every resource derives the same id from the connection itself.
+    ---@type table<integer, FxPendingConnection>
+    local pending <const> = {}
+    FXC.pendingConnections = pending
+
+    ---@param p { name: string, lsmpId: integer?, ip: string?, hwid: string? }
+    ---@return integer
+    local function connectionId(p)
+      local key <const> = table.concat({ p.name or '', tostring(p.lsmpId), p.ip or '', p.hwid or '' }, '|')
+      local id <const> = 65536 + lsmp.hash(key) % 65536
+      if pending[id] == nil then
+        pending[id] = { name = p.name, lsmpId = p.lsmpId, ip = p.ip, hwid = p.hwid }
+        setTimeout(function() pending[id] = nil end, 120000)
+      end
+      return id
+    end
+
+    -- Registered before any script handler, so the record exists when they run.
+    lsmp.on('playerPreConnection', function(p) connectionId(p) end)
+
     ENGINE.playerDropped = {
       event = 'playerLeave',
       adapt = function(playerId, _, reason, detail)
@@ -49,9 +76,19 @@ do
         return playerId, { x = position.x, y = position.y, z = position.z, heading = heading, model = model }
       end,
     }
+    --- FiveM passes the temporary connection id as `oldID`.
     ENGINE.playerJoining = {
       event = 'playerJoin',
-      adapt = function(playerId) return playerId, tostring(playerId) end,
+      adapt = function(playerId, name)
+        local account <const> = lsmp.getPlayerLsmpId(playerId)
+        for id, record in next, pending do
+          if (account ~= nil and record.lsmpId == account) or (account == nil and record.name == name) then
+            pending[id] = nil
+            return playerId, tostring(id)
+          end
+        end
+        return playerId, tostring(playerId)
+      end,
     }
     -- Documented for JS only; a Lua subscription loads fine (docs/notes/probe-server.md), a real connection is unverified.
     ENGINE.playerConnecting = {
@@ -66,7 +103,7 @@ do
             if reason ~= nil then p.deny(tostring(reason)) end
           end,
         }
-        return nil, p.name, setKickReason, deferrals
+        return connectionId(p), p.name, setKickReason, deferrals
       end,
     }
   end

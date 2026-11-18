@@ -10,9 +10,21 @@ if FXC.side == 'server' then
     return out
   end
 
+  local pending <const> = FXC.pendingConnections
+
+  --- A temporary `playerConnecting` source, before LS:MP gives the player an id.
+  ---@param src integer|string
+  ---@return FxPendingConnection?
+  local function connecting(src)
+    local id <const> = toPlayerId(src)
+    return id and pending[id] or nil
+  end
+
   ---@param src integer|string
   ---@return string?
   function GetPlayerName(src)
+    local record <const> = connecting(src)
+    if record ~= nil then return record.name end
     local id = toPlayerId(src)
     return id and lsmp.getPlayerName(id) or nil
   end
@@ -20,8 +32,15 @@ if FXC.side == 'server' then
   ---@param src integer|string
   ---@return string[]
   function GetPlayerIdentifiers(src)
-    local id = toPlayerId(src)
     local out = {}
+    local record <const> = connecting(src)
+    if record ~= nil then
+      if record.lsmpId ~= nil then out[#out + 1] = 'license:' .. tostring(record.lsmpId) end
+      if record.ip ~= nil then out[#out + 1] = 'ip:' .. record.ip end
+      out[#out + 1] = 'name:' .. record.name
+      return out
+    end
+    local id = toPlayerId(src)
     if id == nil then return out end
     local account = lsmp.getPlayerLsmpId(id)
     if account ~= nil then out[#out + 1] = 'license:' .. tostring(account) end
