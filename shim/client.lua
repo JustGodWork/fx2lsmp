@@ -23,6 +23,32 @@ if FXC.side == 'client' then
     return aliases['N_0x' .. string.rep('0', 16 - #digits) .. digits:upper()]
   end
 
+  ---@param key string
+  ---@return string
+  local function aliasOf(key)
+    return aliases[key] or hashAlias(key) or (lower(sub(key, 1, 1)) .. sub(key, 2))
+  end
+
+  --- A native by its FiveM name. Does not rely on the lazy _G lookup, which the LS:MP client refuses.
+  ---@param key string
+  ---@return (fun(...: any): ...)?
+  local function native(key)
+    local fn = rawget(_G, key)
+    if fn == nil then
+      local ok, found = pcall(function() return _G[aliasOf(key)] end)
+      fn = ok and found or nil
+    end
+    return type(fn) == 'function' and fn or nil
+  end
+
+  ---@param key string
+  ---@return fun(...: any): ...
+  local function requireNative(key)
+    local fn <const> = native(key)
+    if fn == nil then error('LS:MP has no native ' .. key, 2) end
+    return fn
+  end
+
   do
     local meta = getmetatable(_G)
     local previous = type(meta) == 'table' and meta.__index or nil
@@ -33,7 +59,7 @@ if FXC.side == 'client' then
       if type(key) == 'string' then
         local first = byte(key, 1)
         if first ~= nil and first >= 65 and first <= 90 then
-          local alias = aliases[key] or hashAlias(key) or (lower(sub(key, 1, 1)) .. sub(key, 2))
+          local alias = aliasOf(key)
           local fn = rawget(t, alias)
           if fn == nil then fn = chain(previous, t, alias) end
           if fn ~= nil then
@@ -52,9 +78,8 @@ if FXC.side == 'client' then
     end
     for _, key in ipairs(FXCOMPAT_CONFIG.natives or {}) do
       if rawget(_G, key) == nil then
-        local alias = aliases[key] or hashAlias(key) or (lower(sub(key, 1, 1)) .. sub(key, 2))
-        local ok, fn = pcall(function() return _G[alias] end)
-        if ok and type(fn) == 'function' then rawset(_G, key, fn) end
+        local fn = native(key)
+        if fn ~= nil then rawset(_G, key, fn) end
       end
     end
   end
@@ -116,11 +141,12 @@ if FXC.side == 'client' then
   function GetPlayerFromServerId(serverId)
     local id = FXC.toLsmp(serverId)
     if id == nil then return -1 end
-    if id == lsmp.getLocalPlayer() then return G.PlayerId() end
+    if id == lsmp.getLocalPlayer() then return requireNative('PlayerId')() end
     local ped = lsmp.getPlayerPed(id)
     if ped == nil then return -1 end
+    local getPlayerPed <const> = requireNative('GetPlayerPed')
     for slot = 0, 63 do
-      if G.GetPlayerPed(slot) == ped then return slot end
+      if getPlayerPed(slot) == ped then return slot end
     end
     return -1
   end
@@ -128,11 +154,11 @@ if FXC.side == 'client' then
   ---@param slot integer
   ---@return integer
   function GetPlayerServerId(slot)
-    if slot == G.PlayerId() then
+    if slot == requireNative('PlayerId')() then
       local own <const> = lsmp.getLocalPlayer()
       return own ~= nil and FXC.toFiveM(own) or 0
     end
-    local ped = G.GetPlayerPed(slot)
+    local ped = requireNative('GetPlayerPed')(slot)
     if ped == nil or ped == 0 then return 0 end
     for _, id in ipairs(lsmp.getPlayers()) do
       if lsmp.getPlayerPed(id) == ped then return FXC.toFiveM(id) end
@@ -371,7 +397,7 @@ if FXC.side == 'client' then
   ---@type FxKeyMapping[]
   local mappings = {}
   local polling = false
-  ---@type fun(pad: integer, control: integer): boolean
+  ---@type fun(...: any): ...
   local justPressed, justReleased
 
   local function poll()
@@ -403,7 +429,7 @@ if FXC.side == 'client' then
     mappings[#mappings + 1] = mapping
     if not polling then
       polling = true
-      justPressed, justReleased = G.IsControlJustPressed, G.IsControlJustReleased
+      justPressed, justReleased = requireNative('IsControlJustPressed'), requireNative('IsControlJustReleased')
       lsmp.onTick(poll)
     end
   end

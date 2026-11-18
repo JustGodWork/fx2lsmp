@@ -28,6 +28,10 @@ describe("client native names", () => {
       await world.loadLuaShim(res, "client", "FXCOMPAT_CONFIG.natives = { 'ProbeNative' }");
       expect(client.errors()).toEqual([]);
       expect(await client.eval("return ProbeNative()")).toBe(7);
+      client.load("keys.lua", "RegisterKeyMapping('+probe', 'Probe', 'keyboard', 'E') RegisterCommand('+probe', function() end)");
+      await world.advance(100);
+      expect(await client.eval("return GetPlayerServerId(0)")).toBeGreaterThan(0);
+      expect(client.errors()).toEqual([]);
     } finally {
       world.close();
     }
