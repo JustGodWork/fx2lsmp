@@ -1,0 +1,17 @@
+body {
+  margin: 0;
+  font-family: sans-serif;
+}
+
+#panel {
+  position: absolute;
+  top: 20%;
+  left: 40%;
+  padding: 16px;
+  background: rgba(20, 20, 20, 0.9);
+  color: #fff;
+}
+
+.hidden {
+  display: none;
+}
