@@ -1,0 +1,1 @@
+{ "title": "fxprobe", "server_scripts": ["probe.lua", "g/*.lua"], "dependencies": ["fxprobe2"] }
