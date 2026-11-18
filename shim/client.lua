@@ -198,6 +198,38 @@ if FXC.side == 'client' then
   VehToNet, PedToNet, ObjToNet = NetworkGetNetworkIdFromEntity, NetworkGetNetworkIdFromEntity,
     NetworkGetNetworkIdFromEntity
 
+  --- Net ids are LS:MP's (see above): the game's own tables know none of them.
+  ---@param netId integer
+  ---@return boolean
+  function NetworkDoesNetworkIdExist(netId) return lsmp.getEntityFromNetId(netId) ~= nil end
+  NetworkDoesEntityExistWithNetworkId = NetworkDoesNetworkIdExist
+
+  ---@param handle integer
+  ---@return boolean
+  function NetworkGetEntityIsNetworked(handle) return lsmp.getNetIdFromEntity(handle) ~= nil end
+
+  --- The GTA session is not LS:MP's: it is started once the LS:MP local player exists.
+  ---@return boolean
+  function NetworkIsSessionStarted() return lsmp.getLocalPlayer() ~= nil end
+
+  -- Raises "disabled by LSMP script policy" under LS:MP, which would kill the calling thread.
+  function ShutdownLoadingScreen() end
+
+  ---@type table<string, string>
+  local POLICY_NOOPS <const> = {
+    SetNetworkIdCanMigrate = 'LS:MP owns network migration',
+    SetWeatherTypeNow = 'LS:MP manages the weather',
+    SetWeatherTypePersist = 'LS:MP manages the weather',
+    SetWeatherTypeNowPersist = 'LS:MP manages the weather',
+    ClearOverrideWeather = 'LS:MP manages the weather',
+    ClearWeatherTypePersist = 'LS:MP manages the weather',
+  }
+  for name, reason in pairs(POLICY_NOOPS) do
+    local message <const> = name .. ' is blocked by the LS:MP script policy (' .. reason .. '): the call does nothing'
+    ---@return nil
+    rawset(_G, name, function() FXC.warnOnce('policy:' .. name, message) end)
+  end
+
   ---@type LsmpBrowser?
   local browser
   ---@type table<string, fun(data: any, cb: fun(response?: any, error?: any))>

@@ -444,6 +444,14 @@ describe("client natives", () => {
       2,
     ]);
     expect(await first.eval("return [NetworkGetNetworkIdFromEntity(10005), NetworkGetEntityFromNetworkId(5), NetToVeh(5), VehToNet(10006)]")).toEqual([5, 10005, 10005, 6]);
+    expect(await first.eval("return [NetworkDoesNetworkIdExist(5), NetworkDoesEntityExistWithNetworkId(5), NetworkGetEntityIsNetworked(10005), NetworkGetEntityIsNetworked(3), NetworkIsSessionStarted()]")).toEqual([true, true, true, false, true]);
+  });
+
+  it("turns natives blocked by the LS:MP policy into no-ops that warn once", async () => {
+    expect(await first.eval("ShutdownLoadingScreen(); SetNetworkIdCanMigrate(1, true); SetWeatherTypeNow('CLEAR'); SetWeatherTypeNow('RAIN'); return 1")).toBe(1);
+    const lines = first.logs();
+    expect(lines.filter((l) => l.includes("SetWeatherTypeNow is blocked")).length).toBe(1);
+    expect(lines.filter((l) => l.includes("SetNetworkIdCanMigrate is blocked")).length).toBe(1);
   });
 });
 

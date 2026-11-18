@@ -71,6 +71,18 @@ describe("player ids", () => {
   it("maps network ids", async () => {
     expect(await client().eval("return { NetworkGetNetworkIdFromEntity(10005), NetworkGetEntityFromNetworkId(5), NetToVeh(7) }")).toEqual([5, 10005, 10007]);
   });
+
+  it("answers net id and session queries from LS:MP state", async () => {
+    expect(await client().eval("return { NetworkDoesNetworkIdExist(5), NetworkDoesEntityExistWithNetworkId(5), NetworkGetEntityIsNetworked(10005), NetworkGetEntityIsNetworked(3), NetworkIsSessionStarted() }")).toEqual([true, true, true, false, true]);
+  });
+
+  it("turns natives blocked by the LS:MP policy into no-ops that warn once", async () => {
+    const c = client();
+    expect(await c.eval("ShutdownLoadingScreen(); SetNetworkIdCanMigrate(1, true); SetWeatherTypeNow('CLEAR'); SetWeatherTypeNow('RAIN'); return 1")).toBe(1);
+    const lines = await c.logs();
+    expect(lines.filter((l) => l.includes("SetWeatherTypeNow is blocked")).length).toBe(1);
+    expect(lines.filter((l) => l.includes("SetNetworkIdCanMigrate is blocked")).length).toBe(1);
+  });
 });
 
 describe("client commands and key mappings", () => {

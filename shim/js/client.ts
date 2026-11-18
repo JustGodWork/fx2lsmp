@@ -22,6 +22,15 @@ interface RawNuiResponse {
 const NUI_TIMEOUT_MS = 15000;
 const MAX_SLOT = 63;
 
+const POLICY_NOOPS: Readonly<Record<string, string>> = {
+  SetNetworkIdCanMigrate: "LS:MP owns network migration",
+  SetWeatherTypeNow: "LS:MP manages the weather",
+  SetWeatherTypePersist: "LS:MP manages the weather",
+  SetWeatherTypeNowPersist: "LS:MP manages the weather",
+  ClearOverrideWeather: "LS:MP manages the weather",
+  ClearWeatherTypePersist: "LS:MP manages the weather",
+};
+
 /** Game control ids (INPUT_*) of the keyboard keys FiveM key mappings usually use. */
 const KEY_CONTROLS: Readonly<Record<string, number>> = {
   Q: 44, E: 38, R: 45, T: 245, Y: 246, U: 303, H: 74, F: 23, G: 47, K: 311, L: 182, Z: 20, X: 73, C: 26, V: 0, B: 29,
@@ -69,6 +78,17 @@ function installPlayers(client: LsmpClient): void {
   expose("NetworkGetEntityFromNetworkId", toEntity);
   for (const name of ["NetToEnt", "NetToVeh", "NetToPed", "NetToObj"]) expose(name, toEntity);
   for (const name of ["VehToNet", "PedToNet", "ObjToNet"]) expose(name, toNet);
+  // net ids are LS:MP's: the game's own tables know none of them
+  expose("NetworkDoesNetworkIdExist", (netId: number) => client.getEntityFromNetId(netId) !== null);
+  expose("NetworkDoesEntityExistWithNetworkId", (netId: number) => client.getEntityFromNetId(netId) !== null);
+  expose("NetworkGetEntityIsNetworked", (handle: number) => client.getNetIdFromEntity(handle) !== null);
+  // the GTA session is not LS:MP's: it is started once the LS:MP local player exists
+  expose("NetworkIsSessionStarted", () => client.getLocalPlayer() !== null);
+  // these raise "disabled by LSMP script policy" under LS:MP, which would abort the calling script
+  expose("ShutdownLoadingScreen", () => undefined);
+  for (const [name, reason] of Object.entries(POLICY_NOOPS)) {
+    expose(name, () => warnOnce(`policy:${name}`, `${name} is blocked by the LS:MP script policy (${reason}): the call does nothing`));
+  }
 }
 
 let browser: LsmpBrowser | null = null;
