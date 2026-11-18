@@ -32,6 +32,15 @@
     return host.resource;
   };
 
+  // FiveM pages test it to tell CEF from a plain browser, where many show demo data instead of waiting for messages.
+  /**
+   * @param {string} name
+   * @returns {void}
+   */
+  window.invokeNative = function (name) {
+    console.warn("invokeNative('" + String(name) + "') has no LS:MP equivalent: ignored");
+  };
+
   host.on("__fxnui", function (data) {
     window.dispatchEvent(new MessageEvent("message", { data: decode(data) }));
   });

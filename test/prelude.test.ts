@@ -28,6 +28,11 @@ describe("nui-prelude.js", () => {
     expect(page.run("GetParentResourceName()")).toBe("myres");
   });
 
+  it("defines window.invokeNative so pages know they run in the game", () => {
+    const { page } = openPage(() => Promise.resolve(null));
+    expect(page.run("typeof window.invokeNative")).toBe("function");
+  });
+
   it("turns __fxnui into a window message event", () => {
     const { page } = openPage(() => Promise.resolve(null));
     page.receive("__fxnui", [{ type: "open", n: 1 }]);
