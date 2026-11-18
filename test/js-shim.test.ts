@@ -418,6 +418,10 @@ describe("client natives", () => {
     expect(DATA.names).not.toContain("wait");
   });
 
+  it("reports the local player and known slots as active in the network session", async () => {
+    expect(await first.eval("return [NetworkIsPlayerActive(PlayerId()), NetworkIsPlayerActive(1), NetworkIsPlayerConnected(9)]")).toEqual([true, true, false]);
+  });
+
   it("maps server ids to player slots", async () => {
     expect(await first.eval("return [GetPlayerServerId(PlayerId()), GetPlayerFromServerId(1), GetPlayerFromServerId(2), GetPlayerFromServerId(9), GetActivePlayers(), GetPlayerServerId(1)]")).toEqual([
       1,

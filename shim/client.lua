@@ -166,6 +166,15 @@ if FXC.side == 'client' then
     return 0
   end
 
+  --- The GTA network session is not LS:MP's: a slot is active when it maps to an LS:MP player.
+  ---@param slot integer
+  ---@return boolean
+  function NetworkIsPlayerActive(slot)
+    if slot == requireNative('PlayerId')() then return lsmp.getLocalPlayer() ~= nil end
+    return GetPlayerServerId(slot) ~= 0
+  end
+  NetworkIsPlayerConnected = NetworkIsPlayerActive
+
   ---@return integer[]
   function GetActivePlayers()
     local out = {}

@@ -35,13 +35,19 @@ function installPlayers(client: LsmpClient): void {
     return -1;
   };
   expose("GetPlayerFromServerId", fromServerId);
-  expose("GetPlayerServerId", (slot: number) => {
+  const serverIdOf = (slot: number): number => {
     if (slot === playerId()) return toFiveM(client.getLocalPlayer() ?? -1);
     const ped = getPlayerPed(slot);
     if (typeof ped !== "number" || ped === 0) return 0;
     const found = client.getPlayers().find((id) => client.getPlayerPed(id) === ped);
     return found === undefined ? 0 : toFiveM(found);
-  });
+  };
+  expose("GetPlayerServerId", serverIdOf);
+  // the GTA network session is not LS:MP's: a slot is active when it maps to an LS:MP player
+  const isActive = (slot: number): boolean =>
+    slot === playerId() ? client.getLocalPlayer() !== null : serverIdOf(slot) !== 0;
+  expose("NetworkIsPlayerActive", isActive);
+  expose("NetworkIsPlayerConnected", isActive);
   expose("GetActivePlayers", () => client.getPlayers().map((id) => fromServerId(toFiveM(id))).filter((slot) => slot !== -1));
   const toNet = (handle: number): number => client.getNetIdFromEntity(handle) ?? 0;
   const toEntity = (netId: number): number => client.getEntityFromNetId(netId) ?? 0;

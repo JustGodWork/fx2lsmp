@@ -63,6 +63,7 @@ describe("player ids", () => {
     expect(await client().eval("return GetPlayerServerId(1)")).toBe(2);
     expect(await client().eval("return GetPlayerFromServerId(99)")).toBe(-1);
     expect(await client().eval("return GetActivePlayers()")).toEqual([0, 1]);
+    expect(await client().eval("return { NetworkIsPlayerActive(PlayerId()), NetworkIsPlayerActive(1), NetworkIsPlayerConnected(9) }")).toEqual([true, true, false]);
   });
 
   it("maps network ids", async () => {
