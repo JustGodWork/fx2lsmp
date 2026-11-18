@@ -74,6 +74,8 @@ server_script 'server.lua'
 ```
 
 - The shim (`_fxcompat/init.lua`, or `init.js` for JavaScript resources) runs first on both sides.
+- Lua scripts run from one generated loader per side (`_fxcompat/run_client.lua`, `_fxcompat/run_server.lua`), in manifest
+  order: LS:MP starts the next file as soon as one suspends, FiveM does not.
 - `ui_page` becomes a `webui` folder served at `rsc://<resource>/`.
 - `data_file` lines become `data_files` entries; `dependency`/`dependencies` are kept.
 - The resource name is lower-cased (LS:MP only accepts `[a-z0-9_-]`).
