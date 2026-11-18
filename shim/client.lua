@@ -257,6 +257,7 @@ if FXC.side == 'client' then
     callbacks[name] = fn
     nuiBrowser()
   end
+  RegisterNuiCallback = RegisterNUICallback
 
   ---@class FxRawNuiRequest
   ---@field resource string
@@ -303,11 +304,13 @@ if FXC.side == 'client' then
   local function applyFocus()
     local b = nuiBrowser()
     if b == nil then return end
+    local ok
     if not focused then
-      b:setFocus(false)
+      ok = b:setFocus(false)
     else
-      b:setFocus(true, { cursor = cursor or keepInput, keepInput = keepInput })
+      ok = b:setFocus(true, { cursor = cursor or keepInput, keepInput = keepInput })
     end
+    if not ok then FXC.warnOnce('focus', 'SetNuiFocus: LS:MP refused the focus change of the NUI page') end
   end
 
   ---@param hasFocus boolean

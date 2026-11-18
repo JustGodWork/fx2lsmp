@@ -93,10 +93,12 @@ function installNui(client: LsmpClient): void {
   };
   const registerType = (name: string): void => bind(name);
   expose("RegisterNuiCallbackType", registerType);
-  expose("RegisterNUICallback", (name: string, fn: Handler) => {
+  const registerCallback = (name: string, fn: Handler): void => {
     AddEventHandler(NUI_CALLBACK_PREFIX + name, fn);
     bind(name);
-  });
+  };
+  expose("RegisterNUICallback", registerCallback);
+  expose("RegisterNuiCallback", registerCallback);
   expose("SendNUIMessage", (data: unknown) => nuiBrowser(client)?.emit(NUI_EVENT, toJson(data)) ?? false);
   const applyFocus = (): void => {
     const b = nuiBrowser(client);

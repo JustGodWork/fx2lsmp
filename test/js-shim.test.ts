@@ -366,6 +366,9 @@ describe("server functions", () => {
     server.fire("playerLeave", 50, "Leaver", "timeout", "");
     await world.advance(10);
     expect(await server.eval("return globalThis.droppedLicense")).toBe(license);
+    await world.advance(1000);
+    expect(await server.eval("return GetPlayerIdentifierByType(51, 'license')")).toBe(license);
+    await world.advance(30000);
     expect(await server.eval("return GetPlayerIdentifierByType(51, 'license')")).toBe(null);
   });
 
@@ -462,7 +465,7 @@ describe("NUI", () => {
       globalThis.nui = {};
       RegisterNuiCallbackType('close');
       on('__cfx_nui:close', (data, cb) => { nui.close = data; SetNuiFocus(false, false); cb({ ok: true, reason: data.reason }); });
-      RegisterNUICallback('direct', (data, cb) => cb('direct:' + data.n));
+      RegisterNuiCallback('direct', (data, cb) => cb('direct:' + data.n));
       RegisterNUICallback('slow', (data, cb) => { setTimeout(() => cb('later'), 100); });
       RegisterNUICallback('none', () => {});
       RegisterNUICallback('sparse', (data, cb) => cb({ 3: 'x', names: ['a'] }));

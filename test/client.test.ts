@@ -27,7 +27,7 @@ const CLIENT = `
     cb({ ok = true, reason = data.reason })
   end)
   RegisterNUICallback('slow', function(data, cb) SetTimeout(100, function() cb('later') end) end)
-  RegisterNUICallback('sparse', function(data, cb) cb({ [3] = 'x', names = { 'a' } }) end)
+  RegisterNuiCallback('sparse', function(data, cb) cb({ [3] = 'x', names = { 'a' } }) end)
 `;
 
 let world: World;

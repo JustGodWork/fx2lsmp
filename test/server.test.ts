@@ -44,6 +44,9 @@ describe("players", () => {
     world.server.fire("playerLeave", 40, "Guest", "timeout", "");
     await world.advance(10);
     expect(await server("return DROPPED_LICENSE")).toBe(license);
+    await world.advance(1000);
+    expect(await server("return GetPlayerIdentifierByType(41, 'license')")).toBe(license);
+    await world.advance(30000);
     expect(await server("return GetPlayerIdentifierByType(41, 'license') == nil")).toBe(true);
   });
 

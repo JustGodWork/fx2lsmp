@@ -9,8 +9,9 @@ function playerOf(src: unknown): number | null {
   return toLsmp(src);
 }
 
-// FiveM still answers the identifier natives inside playerDropped; LS:MP may not once the player is leaving.
+// FiveM still answers the identifier natives inside playerDropped; LS:MP 0.6.8 returns null there.
 const lastIdentifiers = new Map<number, string[]>();
+const IDENTIFIERS_KEPT_MS = 30000;
 
 function identifiersOf(server: LsmpServer, src: unknown): string[] {
   const id = playerOf(src);
@@ -103,8 +104,11 @@ function installPlayers(server: LsmpServer): void {
   host.on("playerLeave", (id) => {
     if (typeof id !== "number") return;
     joinedAt.delete(id);
-    // cleared after the dispatch, so every playerDropped handler still reads them
-    setTimeout(() => lastIdentifiers.delete(id), 0);
+    // kept a while: another resource's playerDropped handler reaches this one through an export after this dispatch
+    const kept = lastIdentifiers.get(id);
+    setTimeout(() => {
+      if (lastIdentifiers.get(id) === kept) lastIdentifiers.delete(id);
+    }, IDENTIFIERS_KEPT_MS);
   });
   // seconds since the join, counted from the first sighting for players present before the shim loaded
   expose("GetPlayerTimeOnline", (src: unknown) => {
