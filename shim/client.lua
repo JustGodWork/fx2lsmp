@@ -25,7 +25,7 @@ if FXC.side == 'client' then
 
   do
     local meta = getmetatable(_G)
-    local previous = meta ~= nil and meta.__index or nil
+    local previous = type(meta) == 'table' and meta.__index or nil
     ---@param t table
     ---@param key any
     ---@return any

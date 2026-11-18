@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { clientNativeNames, renderConfig } from "../tools/fx2lsmp/cli.ts";
+import { World, nth } from "./harness.ts";
 
 describe("client native names", () => {
   it("lists PascalCase and N_0x names of the client loader and modules, not fields or methods", () => {
@@ -15,5 +16,20 @@ describe("client native names", () => {
 
   it("writes them into the shared config", () => {
     expect(renderConfig(undefined, {}, undefined, {}, ["PlayerPedId"])).toContain('natives = { "PlayerPedId" },');
+  });
+
+  it("defines listed natives on a client whose _G metatable is protected", async () => {
+    const world = await World.create({ luaMain: false, clients: 1 });
+    try {
+      const res = await world.addLua("protected");
+      const client = nth(res.clients, 0);
+      // The LS:MP client answers getmetatable(_G) with a boolean
+      client.load("protect.lua", "probeNative = function() return 7 end setmetatable(_G, { __metatable = true })");
+      await world.loadLuaShim(res, "client", "FXCOMPAT_CONFIG.natives = { 'ProbeNative' }");
+      expect(client.errors()).toEqual([]);
+      expect(await client.eval("return ProbeNative()")).toBe(7);
+    } finally {
+      world.close();
+    }
   });
 });
