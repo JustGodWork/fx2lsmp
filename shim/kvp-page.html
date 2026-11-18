@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<script>
+(function () {
+  "use strict";
+
+  var PREFIX = "fxkvp:";
+
+  // Entries are { t: "s" | "i" | "f", v: string | number } under "fxkvp:<key>".
+  function readAll() {
+    var out = {};
+    for (var i = 0; i < localStorage.length; i++) {
+      var storageKey = localStorage.key(i);
+      if (storageKey === null || storageKey.indexOf(PREFIX) !== 0) continue;
+      try {
+        out[storageKey.slice(PREFIX.length)] = JSON.parse(localStorage.getItem(storageKey));
+      } catch (e) {
+        localStorage.removeItem(storageKey);
+      }
+    }
+    return out;
+  }
+
+  lsmp.on("kvp:all", function () {
+    return readAll();
+  });
+
+  lsmp.on("kvp:set", function (key, type, value) {
+    localStorage.setItem(PREFIX + key, JSON.stringify({ t: type, v: value }));
+  });
+
+  lsmp.on("kvp:del", function (key) {
+    localStorage.removeItem(PREFIX + key);
+  });
+})();
+</script>
+</body>
+</html>
