@@ -9,6 +9,7 @@ import { installMsgpack } from "./msgpack.ts";
 import { installNatives } from "./natives.ts";
 import { installServer } from "./server.ts";
 import { installStateBags } from "./statebags.ts";
+import { installStubs } from "./stubs.ts";
 import { side } from "./runtime.ts";
 
 installCore();
@@ -27,3 +28,4 @@ if (side === "server") {
   installEntities();
   installB1();
 }
+installStubs();

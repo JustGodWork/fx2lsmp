@@ -111,6 +111,7 @@ __fxc_nil = setmetatable({}, { __newindex = function() end })
 ---@field convars table<string, string>
 ---@field metadata table<string, string[]>?
 ---@field natives string[]? FiveM native names the client code uses, defined up front when the _G metatable is protected
+---@field stubs table<'client'|'server', table<string, 'bool'|'int'|'float'|'string'|'vector'|'nil'>>? natives the resource calls that LS:MP cannot provide, by result kind
 ---@field chatBridge boolean?
 ---@field expose boolean?
 

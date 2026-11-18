@@ -1,5 +1,13 @@
 import { isRecord } from "./protocol.ts";
 
+export type StubKind = "bool" | "int" | "float" | "string" | "vector" | "nil";
+
+const STUB_KINDS: readonly string[] = ["bool", "int", "float", "string", "vector", "nil"];
+
+function isStubKind(value: unknown): value is StubKind {
+  return typeof value === "string" && STUB_KINDS.includes(value);
+}
+
 export interface FxConfig {
   uiPage?: string;
   kvpPage?: string;
@@ -8,6 +16,7 @@ export interface FxConfig {
   applyEntities?: boolean;
   convars: Record<string, string>;
   metadata: Record<string, string[]>;
+  stubs: Record<"client" | "server", Record<string, StubKind>>;
 }
 
 function isClient(candidate: LsmpShared): candidate is LsmpClient {
@@ -20,7 +29,7 @@ function isServer(candidate: LsmpShared): candidate is LsmpServer {
 
 function readConfig(): FxConfig {
   const raw: unknown = Reflect.get(globalThis, "FXCOMPAT_CONFIG");
-  const config: FxConfig = { convars: {}, metadata: {} };
+  const config: FxConfig = { convars: {}, metadata: {}, stubs: { client: {}, server: {} } };
   if (!isRecord(raw)) return config;
   if (typeof raw["uiPage"] === "string") config.uiPage = raw["uiPage"];
   if (typeof raw["kvpPage"] === "string") config.kvpPage = raw["kvpPage"];
@@ -33,6 +42,13 @@ function readConfig(): FxConfig {
   if (isRecord(raw["metadata"])) {
     for (const [k, v] of Object.entries(raw["metadata"])) {
       if (Array.isArray(v)) config.metadata[k] = v.filter((e): e is string => typeof e === "string");
+    }
+  }
+  const stubs = raw["stubs"];
+  if (isRecord(stubs)) {
+    for (const key of ["client", "server"] as const) {
+      const list = stubs[key];
+      if (isRecord(list)) for (const [name, kind] of Object.entries(list)) if (isStubKind(kind)) config.stubs[key][name] = kind;
     }
   }
   return config;

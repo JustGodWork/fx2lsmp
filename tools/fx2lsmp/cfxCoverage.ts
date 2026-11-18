@@ -115,6 +115,38 @@ export function looksLikeNative(name: string): boolean {
   return !/^[A-Z][A-Z0-9_]*$/.test(name) && !/^N_0x/i.test(name) && !NOT_NATIVES.has(name);
 }
 
+/** What an uncovered native returns, by result type. */
+export type StubKind = "bool" | "int" | "float" | "string" | "vector" | "nil";
+
+export type StubConfig = Record<Side, Record<string, StubKind>>;
+
+const STUB_KINDS: Readonly<Record<string, StubKind>> = {
+  BOOL: "bool", bool: "bool",
+  int: "int", long: "int", Hash: "int", Entity: "int", Ped: "int", Vehicle: "int", Blip: "int", Player: "int",
+  float: "float",
+  "char*": "string",
+  Vector3: "vector",
+};
+
+/** `void`, `object` and unknown result types give `nil`. */
+export function stubKindOf(result: string): StubKind {
+  return STUB_KINDS[result] ?? "nil";
+}
+
+/** Used, uncovered CFX natives per side, as the name to result kind map the shims turn into warn once stubs. */
+export function stubsFor(data: CfxData, used: readonly UsedNames[]): StubConfig {
+  const out: StubConfig = { client: {}, server: {} };
+  for (const { runtime, names, defined } of used) {
+    const side = sideOf(runtime);
+    for (const name of names) {
+      const entry = data.natives[name];
+      if (entry === undefined || defined.has(name) || !runtimesOf(entry.apiset).includes(runtime) || entry.covered.includes(runtime)) continue;
+      out[side][name] = stubKindOf(entry.result);
+    }
+  }
+  return out;
+}
+
 export interface UsedNames {
   runtime: Runtime;
   names: readonly string[];

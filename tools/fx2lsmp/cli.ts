@@ -6,11 +6,11 @@ import { COMPAT_LIBS, isJsScript, type FxManifest, type LsmpManifest, normalizeR
 import { collectModules, IMPORTS_DIR, LOADER_CLIENT_FILE, LOADER_SERVER_FILE, luaString, MODULES_FILE, renderLoader, type ModuleEntry, withoutRegisteredModules, writeModules } from "./modules.ts";
 import { globToRegExp, listFiles, stageNui } from "./nui.ts";
 import { transpile } from "./transpile.ts";
-import { calledNames, capitalisedNames, coverageWarnings, definedInFiles, loadCatalogueNames, loadCfxData, serverNativeNames, type CfxData, type Runtime, type UsedNames } from "./cfxCoverage.ts";
+import { calledNames, capitalisedNames, coverageWarnings, definedInFiles, loadCatalogueNames, loadCfxData, serverNativeNames, stubsFor, type CfxData, type Runtime, type StubConfig, type StubKind, type UsedNames } from "./cfxCoverage.ts";
 
 export { luaString };
 
-export const SHIM_ORDER: readonly string[] = ["core", "@promise", "promise", "natives_alias", "msgpack", "events", "exports", "server", "client", "entities", "statebags", "kvp", "b1"];
+export const SHIM_ORDER: readonly string[] = ["core", "@promise", "promise", "natives_alias", "msgpack", "events", "exports", "server", "client", "entities", "statebags", "kvp", "b1", "stubs"];
 /** Resources LS:MP starts by itself (docs/notes/c.md): a converted resource with one of these names would clash. */
 const BUNDLED_RESOURCES: ReadonlySet<string> = new Set([
   "spawn-mgr", "chat", "death-mgr", "voice-mgr", "admin-tools", "scoreboard", "player-blips", "event-logger",
@@ -118,14 +118,8 @@ export function clientNativeNames(outDir: string): string[] {
   return [...names].sort();
 }
 
-/** Coverage warnings for the Lua loaders and the JS scripts a converted resource ships. */
-export function nativeCoverageWarnings(
-  outDir: string,
-  fx: FxManifest,
-  luaShim: boolean,
-  data: CfxData = loadCfxData(),
-  catalogue: ReadonlySet<string> = loadCatalogueNames(),
-): string[] {
+/** Names each runtime of a converted resource calls, shared by the coverage warnings and the stubs. */
+export function usedNames(outDir: string, fx: FxManifest, luaShim: boolean): UsedNames[] {
   const used: UsedNames[] = [];
   if (luaShim) {
     // the module registry is shared by both sides and holds text loaded on demand: only the loaders count as use
@@ -149,8 +143,37 @@ export function nativeCoverageWarnings(
     const calls = calledNames(outDir, files, "js");
     used.push({ runtime, names: [...capitalisedNames(outDir, files)].filter((n) => calls.has(n)).sort(), defined: definedInFiles(outDir, files) });
   }
-  if (used.length === 0) return [];
-  return coverageWarnings(data, catalogue, used);
+  return used;
+}
+
+/** Coverage warnings for the Lua loaders and the JS scripts a converted resource ships. */
+export function nativeCoverageWarnings(
+  outDir: string,
+  fx: FxManifest,
+  luaShim: boolean,
+  data: CfxData = loadCfxData(),
+  catalogue: ReadonlySet<string> = loadCatalogueNames(),
+): string[] {
+  const used = usedNames(outDir, fx, luaShim);
+  return used.length === 0 ? [] : coverageWarnings(data, catalogue, used);
+}
+
+/** The stubs of the natives a converted resource calls that no shim provides, per runtime family. */
+export function resourceStubs(outDir: string, fx: FxManifest, luaShim: boolean, data: CfxData = loadCfxData()): { lua: StubConfig; js: StubConfig } {
+  const used = usedNames(outDir, fx, luaShim);
+  return {
+    lua: stubsFor(data, used.filter((u) => u.runtime.startsWith("lua."))),
+    js: stubsFor(data, used.filter((u) => u.runtime.startsWith("js."))),
+  };
+}
+
+function hasStubs(stubs: StubConfig): boolean {
+  return Object.keys(stubs.client).length + Object.keys(stubs.server).length > 0;
+}
+
+function luaStubTable(side: Record<string, StubKind>): string {
+  const entries = Object.keys(side).sort().map((name) => `${name} = ${luaString(side[name] as string)}`);
+  return entries.length === 0 ? "{}" : `{ ${entries.join(", ")} }`;
 }
 
 export function renderConfig(
@@ -159,6 +182,7 @@ export function renderConfig(
   kvpPage?: string,
   metadata: Record<string, string[]> = {},
   natives: readonly string[] = [],
+  stubs: StubConfig = { client: {}, server: {} },
 ): string {
   const metaLines = Object.keys(metadata)
     .sort()
@@ -173,6 +197,7 @@ export function renderConfig(
     "---@field convars table<string, string>",
     "---@field metadata table<string, string[]>",
     "---@field natives string[]?",
+    "---@field stubs table<'client'|'server', table<string, 'bool'|'int'|'float'|'string'|'vector'|'nil'>>?",
     "",
     "---@type FxcompatConfig",
     "FXCOMPAT_CONFIG = {",
@@ -185,6 +210,7 @@ export function renderConfig(
     ...metaLines,
     "  },",
     ...(natives.length === 0 ? [] : [`  natives = { ${natives.map(luaString).join(", ")} },`]),
+    ...(hasStubs(stubs) ? [`  stubs = { client = ${luaStubTable(stubs.client)}, server = ${luaStubTable(stubs.server)} },`] : []),
     "}",
     "",
   ].join("\n");
@@ -197,6 +223,7 @@ export interface JsConfig {
   applyEntities?: boolean;
   convars: Record<string, string>;
   metadata: Record<string, string[]>;
+  stubs?: StubConfig;
 }
 
 const TOP_DECLARATION = /^(?:const|var)\s+([A-Za-z_$][\w$]*)\s*=(?!=)/gm;
@@ -405,8 +432,9 @@ export async function convertResource(opts: ConvertOptions): Promise<ConvertResu
   if (Object.keys(serverConvars).length > 0) {
     writeFileSync(join(outDir, SERVER_CONVARS_FILE), renderServerConvars(serverConvars));
   }
+  const stubs = resourceStubs(outDir, fx, luaShim);
   if (scripts.includes("_fxcompat/init.lua")) {
-    writeFileSync(join(outDir, "_fxcompat", "config.lua"), renderConfig(uiPage, convars, kvpPage, fx.metadata, clientNativeNames(outDir)));
+    writeFileSync(join(outDir, "_fxcompat", "config.lua"), renderConfig(uiPage, convars, kvpPage, fx.metadata, clientNativeNames(outDir), stubs.lua));
     writeFileSync(join(outDir, "_fxcompat", "init.lua"), concatShim(shimDir));
   }
   if (scripts.includes("_fxcompat/init.js")) {
@@ -416,6 +444,7 @@ export async function convertResource(opts: ConvertOptions): Promise<ConvertResu
     if (scripts.includes("_fxcompat/init.lua")) jsConfig.applyEntities = false;
     if (uiPage !== undefined) jsConfig.uiPage = uiPage;
     if (kvpPage !== undefined && jsUsesKvp) jsConfig.kvpPage = kvpPage;
+    if (hasStubs(stubs.js)) jsConfig.stubs = stubs.js;
     writeFileSync(join(outDir, "_fxcompat", "config.js"), renderConfigJs(jsConfig));
     writeFileSync(join(outDir, "_fxcompat", "init.js"), await buildJsShim(shimDir, jsUsesHashes));
   }
