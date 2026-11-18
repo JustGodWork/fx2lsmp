@@ -140,6 +140,12 @@ describe("oxmysql compat: queries", () => {
     expect((await log())[0]?.params).toEqual([1, null, 3]);
   });
 
+  it("expands a list bound to a ? into one mark per value, NULL when empty", async () => {
+    await reset("function() return {} end");
+    await ctx.app.eval("return MySQL.query.await(\"SELECT '?' WHERE c IN (?) AND d = ? AND e IN (?)\", { { 'a', 'b' }, 7, {} })");
+    expect(await log()).toEqual([{ kind: "query", sql: "SELECT '?' WHERE c IN (?, ?) AND d = ? AND e IN (NULL)", params: ["a", "b", 7] }]);
+  });
+
   it("fills trailing nil parameters with SQL NULL up to the ? count, ignoring quoted marks", async () => {
     await reset("function() return {} end");
     await ctx.app.eval("return MySQL.query.await(\"SELECT ?, '?', ?, ? -- ?\", { 'a', nil, nil })");

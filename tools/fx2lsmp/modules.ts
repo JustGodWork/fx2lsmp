@@ -62,14 +62,15 @@ export function renderModules(entries: readonly ModuleEntry[], file: string = MO
 /**
  * One generated script per side holds the resource's own Lua scripts as separate functions and runs them in manifest
  * order inside the one host coroutine LS:MP gives that file: LS:MP starts the next script file as soon as a body
- * suspends (`lsmp.wait`, a pending `lsmp.call`), which FiveM's synchronous exports must not allow. Each entry records
- * the line where its body starts so the shim can name the original file in an error.
+ * suspends (`lsmp.wait`, a pending `lsmp.call`), which FiveM's synchronous exports must not allow. Each entry is also a
+ * module (a script can read its own file and `load` it, as ESX locales do) and records the line where its body starts so
+ * the shim can name the original file in an error.
  */
 export function renderLoader(entries: readonly ModuleEntry[], file: string): string {
   let before = 0;
   const rendered = entries.map((entry) => {
     const body = entry.text.replace(/^#![^\n]*/, "");
-    const text = `__fxc_script(${luaString(file)}, ${luaString(entry.path)}, function(...)\n${body}\nend, ${before + 2})\n`;
+    const text = `__fxc_script(${luaString(file)}, ${luaString(entry.path)}, ${luaString(moduleHash(entry.text))}, function(_ENV) return function(...)\n${body}\nend end, ${before + 2})\n`;
     before += countLines(text);
     return text;
   });

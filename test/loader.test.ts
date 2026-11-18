@@ -122,3 +122,25 @@ describe("sequential script loader", () => {
     expect(await world.server.eval("return ORDER")).toBe("ab");
   });
 });
+
+describe("scripts as modules and CfxLua library helpers", () => {
+  it("lets a script load the text of a listed script, as ESX locales do", async () => {
+    const { out, manifest } = await convert({
+      "fxmanifest.lua": "fx_version 'cerulean'\ngame 'gta5'\nserver_scripts { 'main.lua', 'locales/*.lua' }\n",
+      "main.lua": "",
+      "locales/en.lua": "return { hello = 'Hello' }\n",
+    });
+    world = await World.create({ resource: "app", clients: 0 });
+    world.server.setFile("locales/en.lua", readFileSync(join(out, "locales/en.lua"), "utf8"));
+    loadAll(world.server, out, manifest);
+    await world.advance(TICK_MS * 3);
+    expect(await world.server.eval("return load(LoadResourceFile('app', 'locales/en.lua'))().hello")).toBe("Hello");
+  });
+
+  it("provides table.wipe and string.strsplit", async () => {
+    world = await World.withShim({ resource: "unit", clients: 0 });
+    expect(await world.server.eval("local t = { 1, 2, a = 3 } table.wipe(t) return next(t) == nil")).toBe(true);
+    expect(await world.server.eval("return { string.strsplit(';', 'a;b;;c') }")).toEqual(["a", "b", "", "c"]);
+    expect(await world.server.eval("return { string.strsplit(',;', 'a,b;c', 2) }")).toEqual(["a", "b;c"]);
+  });
+});

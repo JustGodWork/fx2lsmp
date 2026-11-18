@@ -222,10 +222,60 @@ local function bindNamed(sql, params)
   return table.concat(out), values
 end
 
+---@param value any
+---@return boolean
+local function isList(value)
+  return type(value) == 'table' and value ~= null and getmetatable(value) == nil
+end
+
+--- A list bound to a `?` becomes `?, ?, ...` (`IN (?)`), as oxmysql does; an empty list is NULL.
+---@param sql string
+---@param values any[]
+---@return string, any[]
+local function expandLists(sql, values)
+  local found = false
+  for i = 1, #values do
+    if isList(values[i]) then found = true break end
+  end
+  if not found then return sql, values end
+  local out, flat, mark = {}, {}, 0
+  local start, i, n = 1, 1, #sql
+  while i <= n do
+    local c = sql:sub(i, i)
+    if c == "'" or c == '"' or c == '`' then
+      i = skipQuoted(sql, i, c)
+    elseif c == '#' or (c == '-' and sql:sub(i, i + 1) == '--') then
+      local stop = sql:find('\n', i, true)
+      i = stop and stop + 1 or n + 1
+    elseif c == '/' and sql:sub(i + 1, i + 1) == '*' then
+      local _, stop = sql:find('*/', i + 2, true)
+      i = stop and stop + 1 or n + 1
+    elseif c == '?' then
+      mark = mark + 1
+      local value = values[mark]
+      out[#out + 1] = sql:sub(start, i - 1)
+      if isList(value) then
+        local count = #value
+        out[#out + 1] = count == 0 and 'NULL' or ('?, '):rep(count - 1) .. '?'
+        for k = 1, count do flat[#flat + 1] = value[k] end
+      else
+        out[#out + 1] = '?'
+        flat[#flat + 1] = value
+      end
+      start = i + 1
+      i = i + 1
+    else
+      i = i + 1
+    end
+  end
+  out[#out + 1] = sql:sub(start)
+  return table.concat(out), flat
+end
+
 ---@param sql any
 ---@param params any
 ---@return string, any[]
-local function bind(sql, params)
+local function bindParams(sql, params)
   if type(sql) ~= 'string' then error(tag('the query must be a string, got ' .. type(sql)), 0) end
   if params == nil then return sql, {} end
   if type(params) ~= 'table' then return sql, { params } end
@@ -243,6 +293,13 @@ local function bind(sql, params)
     values[i] = value
   end
   return sql, values
+end
+
+---@param sql any
+---@param params any
+---@return string, any[]
+local function bind(sql, params)
+  return expandLists(bindParams(sql, params))
 end
 
 ---@param err string?

@@ -29,7 +29,7 @@
 ---@field registerModule fun(path: string, hash: string, factory: FxModuleFactory)
 ---@field registry fun(file: string): fun(path: string, hash: string, factory: FxModuleFactory, firstLine?: integer)
 ---@field moduleHash fun(text: string): string
----@field script fun(file: string, path: string, body: fun(...: any), firstLine: integer)
+---@field script fun(file: string, path: string, hash: string, factory: FxModuleFactory, firstLine: integer)
 ---@field run fun(file: string)
 ---@field vector2 fun(x?: number, y?: number): FxVector2
 ---@field vector4 fun(x?: number, y?: number, z?: number, w?: number): FxVector4
@@ -264,6 +264,40 @@ do
     end
     local ok = pcall(function() table.unpack = unpackVector end)
     if not ok then FXC.warnOnce('unpack', 'table.unpack is read only: unpacking a vector raises') end
+  end
+
+  --- Helpers FiveM's Lua runtime adds to the standard libraries (ESX and ox_lib code calls them).
+  if table.wipe == nil then
+    ---@param t table
+    ---@return table
+    local function wipe(t)
+      for key in next, t do t[key] = nil end
+      return t
+    end
+    if not pcall(function() table.wipe = wipe end) then FXC.warnOnce('wipe', 'table.wipe could not be defined') end
+  end
+
+  if string.strsplit == nil then
+    --- WoW style split: every character of `delimiter` separates, empty pieces are kept, `pieces` caps the count.
+    ---@param delimiter string
+    ---@param text string
+    ---@param pieces? integer
+    ---@return string ...
+    local function strsplit(delimiter, text, pieces)
+      if delimiter == '' then return text end
+      local out <const> = {}
+      local set <const> = '[' .. string.gsub(delimiter, '[%^%]%-%%]', '%%%0') .. ']'
+      local start = 1
+      while pieces == nil or #out < pieces - 1 do
+        local at <const> = string.find(text, set, start)
+        if at == nil then break end
+        out[#out + 1] = string.sub(text, start, at - 1)
+        start = at + 1
+      end
+      out[#out + 1] = string.sub(text, start)
+      return table.unpack(out)
+    end
+    if not pcall(function() string.strsplit = strsplit end) then FXC.warnOnce('strsplit', 'string.strsplit could not be defined') end
   end
 
   ---@param t table
@@ -936,24 +970,26 @@ do
 
   ---@class FxScript
   ---@field path string
-  ---@field body fun(...: any)
+  ---@field factory FxModuleFactory
 
   ---@type table<string, FxScript[]>
   local scriptsByFile <const> = {}
 
-  --- Adds one Lua script of the resource to the loader `file` and records where its body starts.
+  --- Adds one Lua script of the resource to the loader `file`, also as a module, and records where its body starts.
   ---@param file string
   ---@param path string
-  ---@param body fun(...: any)
+  ---@param hash string
+  ---@param factory FxModuleFactory
   ---@param firstLine integer
-  function FXC.script(file, path, body, firstLine)
+  function FXC.script(file, path, hash, factory, firstLine)
+    FXC.registerModule(path, hash, factory)
     local list = scriptsByFile[file]
     if list == nil then
       list = {}
       scriptsByFile[file] = list
       rangesByFile[file] = {}
     end
-    list[#list + 1] = { path = path, body = body }
+    list[#list + 1] = { path = path, factory = factory }
     local ranges <const> = rangesByFile[file]
     ranges[#ranges + 1] = { first = firstLine, path = path }
   end
@@ -964,7 +1000,7 @@ do
   function FXC.run(file)
     local list <const> = scriptsByFile[file] or {}
     for i = 1, #list do
-      local ok <const>, err <const> = pcall(list[i].body)
+      local ok <const>, err <const> = pcall(list[i].factory(_G))
       if not ok then
         if type(err) ~= 'string' then error(err, 0) end
         error((string.gsub(err, '([^%s:]+):(%d+):', function(path, line)
