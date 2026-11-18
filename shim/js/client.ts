@@ -1,6 +1,6 @@
 import { NUI_CALLBACK_PREFIX, NUI_EVENT, isThenable, toJson } from "./protocol.ts";
 import { AddEventHandler, dispatchLocal, hasHandlers } from "./events.ts";
-import { clientHost, config, expose, logError, native, resource, toPlayerId, warnOnce } from "./runtime.ts";
+import { clientHost, config, expose, logError, native, resource, toFiveM, toLsmp, warnOnce } from "./runtime.ts";
 
 type Command = (source: number, args: string[], rawCommand: string) => unknown;
 type Handler = (...args: unknown[]) => unknown;
@@ -26,7 +26,7 @@ function installPlayers(client: LsmpClient): void {
   const playerId = native("playerId");
   const getPlayerPed = native("getPlayerPed");
   const fromServerId = (serverId: unknown): number => {
-    const id = toPlayerId(serverId);
+    const id = toLsmp(serverId);
     if (id === null) return -1;
     if (id === client.getLocalPlayer()) return Number(playerId());
     const ped = client.getPlayerPed(id);
@@ -36,12 +36,13 @@ function installPlayers(client: LsmpClient): void {
   };
   expose("GetPlayerFromServerId", fromServerId);
   expose("GetPlayerServerId", (slot: number) => {
-    if (slot === playerId()) return client.getLocalPlayer() ?? 0;
+    if (slot === playerId()) return toFiveM(client.getLocalPlayer() ?? -1);
     const ped = getPlayerPed(slot);
     if (typeof ped !== "number" || ped === 0) return 0;
-    return client.getPlayers().find((id) => client.getPlayerPed(id) === ped) ?? 0;
+    const found = client.getPlayers().find((id) => client.getPlayerPed(id) === ped);
+    return found === undefined ? 0 : toFiveM(found);
   });
-  expose("GetActivePlayers", () => client.getPlayers().map(fromServerId).filter((slot) => slot !== -1));
+  expose("GetActivePlayers", () => client.getPlayers().map((id) => fromServerId(toFiveM(id))).filter((slot) => slot !== -1));
   const toNet = (handle: number): number => client.getNetIdFromEntity(handle) ?? 0;
   const toEntity = (netId: number): number => client.getEntityFromNetId(netId) ?? 0;
   expose("NetworkGetNetworkIdFromEntity", toNet);

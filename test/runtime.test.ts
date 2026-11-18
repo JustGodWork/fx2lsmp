@@ -132,7 +132,7 @@ describe("workarounds for B1", () => {
 
   beforeAll(async () => {
     world = await World.withShim({ clients: 2 });
-    await server().eval("lsmp.__test.owners[5] = 1 lsmp.__test.owners[6] = 2");
+    await server().eval("lsmp.__test.owners[5] = 0 lsmp.__test.owners[6] = 1");
   });
   afterAll(() => world.close());
 
@@ -144,7 +144,7 @@ describe("workarounds for B1", () => {
   });
 
   it("covers DeleteVehicle, DeletePed and DeleteObject the same way", async () => {
-    await server().eval("lsmp.__test.owners[11] = 1 lsmp.__test.owners[12] = 1 lsmp.__test.owners[13] = 1");
+    await server().eval("lsmp.__test.owners[11] = 0 lsmp.__test.owners[12] = 0 lsmp.__test.owners[13] = 0");
     await client().eval("DeleteVehicle(10011) DeletePed(10012) DeleteObject(10013)");
     await world.advance(50);
     expect(await server().eval("local d = lsmp.__test.deleted return { d[11], d[12], d[13] }")).toEqual([true, true, true]);
@@ -281,7 +281,7 @@ describe("spawnmanager compat resource", () => {
     await client().eval("exports.spawnmanager:spawnPlayer({ x = 8.0, y = 8.0, z = 8.0 })");
     expect(await client().eval("return #lsmp.__test.resurrects")).toBe(1);
     await client().eval("CALLED = 0 lsmp.__test.dead = true");
-    client().fire("playerDeath", 1, 0, 0, { x: 0, y: 0, z: 0 }, 0, 0);
+    client().fire("playerDeath", 0, 0, 0, { x: 0, y: 0, z: 0 }, 0, 0);
     await world.advance(2200);
     expect(await client().eval("return CALLED")).toBe(1);
     expect(world.allErrors().filter((e) => !e.includes("expected a spawn table"))).toEqual([]);
@@ -329,7 +329,7 @@ describe("playerSpawned on the server", () => {
     const world = await World.withShim({ clients: 1 });
     try {
       await world.server.eval("AddEventHandler('playerSpawned', function(spawn) GOT = { source, spawn.x, spawn.heading } end)");
-      world.server.fire("playerSpawn", 1, { x: 1, y: 2, z: 3 }, 90, 123, true);
+      world.server.fire("playerSpawn", 0, { x: 1, y: 2, z: 3 }, 90, 123, true);
       await world.advance(30);
       expect(await world.server.eval("return GOT")).toEqual([1, 1, 90]);
     } finally {

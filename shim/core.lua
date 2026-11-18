@@ -22,7 +22,10 @@
 ---@field toJson fun(value: any): any
 ---@field fromJson fun(value: any): any
 ---@field warnOnce fun(key: string, message: string)
----@field toPlayerId fun(value: any): integer?
+---@field TEMP_ID_FIRST integer
+---@field toLsmp fun(value: any): integer?
+---@field toFiveM fun(id: integer): integer
+---@field guestLicense fun(hwid: string?): string?
 ---@field noteCommand fun(name: string)
 ---@field promiseDeps FxPromiseDeps
 ---@field promiseLib FxPromiseModule
@@ -146,12 +149,33 @@ do
     lsmp.warn('[fxcompat] ' .. message)
   end
 
-  --- FiveM accepts player ids as numbers or numeric strings; LS:MP accepts integers only.
+  FXC.TEMP_ID_FIRST = 65536
+
+  --- FiveM-visible player id (number or numeric string) to LS:MP id. FiveM ids are LS:MP ids + 1: 0 is the console and
+  --- never a player. -1 (everyone) and the temporary playerConnecting ids (65536 and up) pass through unchanged.
   ---@param value any
   ---@return integer?
-  function FXC.toPlayerId(value)
-    local n = tonumber(value)
-    return n and math.tointeger(n) or nil
+  function FXC.toLsmp(value)
+    local n <const> = math.tointeger(tonumber(value))
+    if n == nil then return nil end
+    if n == -1 or n >= FXC.TEMP_ID_FIRST then return n end
+    if n < 1 then return nil end
+    return n - 1
+  end
+
+  ---@param id integer
+  ---@return integer
+  function FXC.toFiveM(id)
+    if id >= FXC.TEMP_ID_FIRST then return id end
+    return id + 1
+  end
+
+  --- Accounts get their `license:` from LS:MP; a guest gets a stable one derived from the hardware id.
+  ---@param hwid string?
+  ---@return string?
+  function FXC.guestLicense(hwid)
+    if hwid == nil or hwid == '' then return nil end
+    return string.format('license:hwid-%x', lsmp.hash(hwid) & 0xFFFFFFFF)
   end
 
   ---@param name string

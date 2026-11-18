@@ -34,13 +34,13 @@ describe("players", () => {
   });
 
   it("covers entities, routing buckets, ACE and DropPlayer", async () => {
-    expect(await server("local c = GetEntityCoords(GetPlayerPed(1)) return { GetPlayerPed(2), c.x, c.z }")).toEqual([1002, 1, 3]);
+    expect(await server("local c = GetEntityCoords(GetPlayerPed(1)) return { GetPlayerPed(2), c.x, c.z }")).toEqual([1001, 1, 3]);
     expect(await server("return { NetworkGetNetworkIdFromEntity(55), NetworkGetEntityFromNetworkId(55) }")).toEqual([55, 55]);
     expect(await server("SetPlayerRoutingBucket('2', 7) return GetPlayerRoutingBucket(2)")).toBe(7);
-    await server("lsmp.__test.grants[1] = { ['command.secret'] = true }");
+    await server("lsmp.__test.grants[0] = { ['command.secret'] = true }");
     expect(await server("return { IsPlayerAceAllowed(1, 'command.secret'), IsPlayerAceAllowed('2', 'command.secret') }")).toEqual([true, false]);
     await server("DropPlayer('2', 'bye')");
-    expect(await server("return lsmp.__test.kicks[1]")).toEqual({ id: 2, reason: "bye" });
+    expect(await server("return lsmp.__test.kicks[1]")).toEqual({ id: 1, reason: "bye" });
   });
 });
 
@@ -87,20 +87,20 @@ describe("KVP", () => {
 
 describe("commands", () => {
   it("runs a restricted false command for a player with FiveM arguments", async () => {
-    await server("__runCommand(1, 'hello a b')");
+    await server("__runCommand(0, 'hello a b')");
     await world.advance(30);
     expect(await server("return CMD.hello")).toEqual({ src: 1, args: ["a", "b"], raw: "hello a b", source: 1 });
   });
 
   it("lets every player run a command registered without the restricted flag", async () => {
-    expect(await server("return __runCommand(2, 'Mixed.Case')")).toBe("ok");
+    expect(await server("return __runCommand(1, 'Mixed.Case')")).toBe("ok");
     await world.advance(30);
     expect(await server("return CMD.mixed")).toBe(2);
   });
 
   it("denies a restricted command until the player has the permission", async () => {
-    expect(await server("return __runCommand(2, 'secret')")).toBe("denied");
-    expect(await server("return __runCommand(1, 'secret now')")).toBe("ok");
+    expect(await server("return __runCommand(1, 'secret')")).toBe("denied");
+    expect(await server("return __runCommand(0, 'secret now')")).toBe("ok");
     await world.advance(30);
     expect(await server("return CMD.secret")).toEqual({ src: 1, raw: "secret now" });
   });

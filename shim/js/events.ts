@@ -1,6 +1,6 @@
 import { NUI_CALLBACK_PREFIX, SERVER_SOURCE, decodeArgs, encodeArgs, invokerMarker, isRecord, isThenable, splitInvoker } from "./protocol.ts";
 import { runAs } from "./invoker.ts";
-import { clientHost, config, dropped, expose, host, logError, resource, serverHost, side, toPlayerId, warnOnce } from "./runtime.ts";
+import { clientHost, config, dropped, expose, host, logError, resource, serverHost, side, toFiveM, toLsmp, warnOnce } from "./runtime.ts";
 
 type Handler = (...args: unknown[]) => unknown;
 
@@ -34,6 +34,10 @@ function spawnData(position: unknown, heading: unknown, model: unknown): Record<
   return { x: p["x"], y: p["y"], z: p["z"], heading, model };
 }
 
+function fiveMOrNull(playerId: unknown): number | null {
+  return typeof playerId === "number" ? toFiveM(playerId) : null;
+}
+
 function connectingArgs(args: unknown[]): Adapted {
   const p = args[0];
   const deny = isRecord(p) && typeof p["deny"] === "function" ? p["deny"] : null;
@@ -64,19 +68,19 @@ if (side === "server") {
     event: "playerLeave",
     adapt: ([playerId, , reason, detail]) => {
       const text = detail === undefined || detail === null || detail === "" ? String(reason) : `${String(reason)}: ${String(detail)}`;
-      return { source: toPlayerId(playerId), args: [text] };
+      return { source: fiveMOrNull(playerId), args: [text] };
     },
   });
   ENGINE.set("playerSpawned", {
     event: "playerSpawn",
     adapt: ([playerId, position, heading, model]) => ({
-      source: toPlayerId(playerId),
+      source: fiveMOrNull(playerId),
       args: [spawnData(position, heading, model)],
     }),
   });
   ENGINE.set("playerJoining", {
     event: "playerJoin",
-    adapt: ([playerId]) => ({ source: toPlayerId(playerId), args: [String(playerId)] }),
+    adapt: ([playerId]) => ({ source: fiveMOrNull(playerId), args: [String(fiveMOrNull(playerId))] }),
   });
   ENGINE.set("playerConnecting", { event: "playerPreConnection", adapt: connectingArgs });
 } else {
@@ -128,7 +132,7 @@ function subscribeNet(name: string): void {
   if (netSubscribed.has(name)) return;
   netSubscribed.add(name);
   if (serverHost !== null) {
-    serverHost.onClient(name, (src, ...args) => dispatch(name, null, src, decodeArgs(args)));
+    serverHost.onClient(name, (src, ...args) => dispatch(name, null, toFiveM(src), decodeArgs(args)));
   } else if (clientHost !== null) {
     clientHost.onServer(name, (...args) => dispatch(name, null, SERVER_SOURCE, decodeArgs(args)));
   }
@@ -201,7 +205,7 @@ function chatLine(event: string, args: unknown[]): ChatLine | null {
 
 export function TriggerClientEvent(name: string, target: unknown, ...args: unknown[]): void {
   if (serverHost === null) throw new Error("TriggerClientEvent is a server function");
-  const id = toPlayerId(target);
+  const id = toLsmp(target);
   if (id === null) throw new Error(`TriggerClientEvent: invalid target '${String(target)}'`);
   const line = (name === "chatMessage" || name === "chat:addMessage") && config.chatBridge !== false ? chatLine(name, args) : null;
   const wire = encodeArgs(args, dropped);

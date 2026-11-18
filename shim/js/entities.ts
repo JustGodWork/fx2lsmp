@@ -1,5 +1,5 @@
 import { decode, isRecord } from "./protocol.ts";
-import { clientHost, config, expose, host, native, resource, serverHost, toPlayerId, warnOnce } from "./runtime.ts";
+import { clientHost, config, expose, host, native, resource, serverHost, toFiveM, toLsmp, warnOnce } from "./runtime.ts";
 
 // Wire protocol shared with shim/entities.lua, identical for every language shim:
 //   server -> owner client, event ENT_EVENT: { netId, ops: EntityOp[] }, netId 0 = the receiving player
@@ -323,7 +323,7 @@ function installServerEntities(server: LsmpServer): void {
   });
 
   expose("SetPlayerModel", (src: unknown, model: unknown) => {
-    const id = toPlayerId(src);
+    const id = toLsmp(src);
     const hash = toHash(model);
     if (id === null || hash === null) return;
     send(id, 0, [{ op: "playerModel", model: hash }]);
@@ -336,7 +336,10 @@ function installServerEntities(server: LsmpServer): void {
     const kind = server.entityExists(entity) ? server.getEntityType(entity) : null;
     return (kind === null ? undefined : TYPE_IDS[kind]) ?? 0;
   });
-  expose("NetworkGetEntityOwner", (entity: number) => server.getEntityOwner(entity) ?? -1);
+  expose("NetworkGetEntityOwner", (entity: number) => {
+    const owner = server.getEntityOwner(entity);
+    return owner === null ? -1 : toFiveM(owner);
+  });
 
   // Reads come from the owner client. A synchronous getter cannot wait for it, so it returns the last value the shim
   // knows (set through a setter or read earlier) and refreshes that value in the background; the Async twin of each

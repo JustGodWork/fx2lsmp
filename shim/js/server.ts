@@ -1,4 +1,4 @@
-import { expose, host, serverHost, toPlayerId, warnOnce } from "./runtime.ts";
+import { expose, guestLicense, host, serverHost, toFiveM, toLsmp, warnOnce } from "./runtime.ts";
 import { isRecord } from "./protocol.ts";
 
 type Command = (source: number, args: string[], rawCommand: string) => unknown;
@@ -6,7 +6,7 @@ type Command = (source: number, args: string[], rawCommand: string) => unknown;
 const commandNames: string[] = [];
 
 function playerOf(src: unknown): number | null {
-  return toPlayerId(src);
+  return toLsmp(src);
 }
 
 function identifiersOf(server: LsmpServer, src: unknown): string[] {
@@ -14,7 +14,8 @@ function identifiersOf(server: LsmpServer, src: unknown): string[] {
   const out: string[] = [];
   if (id === null) return out;
   const account = server.getPlayerLsmpId(id);
-  if (account !== null && account !== undefined) out.push(`license:${String(account)}`);
+  const license = account !== null && account !== undefined ? `license:${String(account)}` : guestLicense(server.getPlayerIdentifier(id, "hwid"));
+  if (license !== null) out.push(license);
   const ip = server.getPlayerIdentifier(id, "ip");
   if (ip !== null && ip !== undefined) out.push(`ip:${ip}`);
   const name = server.getPlayerName(id);
@@ -67,7 +68,7 @@ function installKvp(server: LsmpServer): void {
 
 function installPlayers(server: LsmpServer): void {
   const identifiers = (src: unknown): string[] => identifiersOf(server, src);
-  expose("GetPlayers", () => server.getPlayers().map(String));
+  expose("GetPlayers", () => server.getPlayers().map((id) => String(toFiveM(id))));
   expose("GetPlayerName", (src: unknown) => {
     const id = playerOf(src);
     return id === null ? null : server.getPlayerName(id);
@@ -165,7 +166,7 @@ function installCommands(server: LsmpServer): void {
     const opts: LsmpCommandOptions | undefined = restricted === true ? undefined : { permission: false };
     server.registerCommand(name, opts, (args, raw, src) => {
       const text = typeof raw === "string" && raw !== "" ? `${name} ${raw}` : name;
-      const id = typeof src === "number" ? src : 0;
+      const id = typeof src === "number" ? toFiveM(src) : 0;
       expose("source", id);
       return handler(id, Array.isArray(args) ? args.map(String) : [], text);
     });

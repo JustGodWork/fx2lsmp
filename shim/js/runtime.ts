@@ -72,10 +72,34 @@ export function logError(context: string, error: unknown): void {
   host.error(`[fxcompat] ${context}: ${text}`);
 }
 
-/** FiveM accepts player ids as numbers or numeric strings; LS:MP accepts integers only. */
-export function toPlayerId(value: unknown): number | null {
+/** First temporary id of a connecting player (playerConnecting); LS:MP ids are below it. */
+export const TEMP_ID_FIRST = 65536;
+
+/** FiveM accepts numbers and numeric strings; LS:MP accepts integers only. */
+export function parseInteger(value: unknown): number | null {
   const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
   return typeof n === "number" && Number.isInteger(n) ? n : null;
+}
+
+/**
+ * FiveM-visible player id to LS:MP id. FiveM ids are LS:MP ids + 1: 0 is the console and never a player.
+ * -1 (everyone) and temporary connecting ids pass through unchanged.
+ */
+export function toLsmp(value: unknown): number | null {
+  const n = parseInteger(value);
+  if (n === null) return null;
+  if (n === -1 || n >= TEMP_ID_FIRST) return n;
+  return n < 1 ? null : n - 1;
+}
+
+export function toFiveM(id: number): number {
+  return id >= TEMP_ID_FIRST ? id : id + 1;
+}
+
+/** Accounts get their `license:` from LS:MP; a guest gets a stable one derived from the hardware id. */
+export function guestLicense(hwid: string | null | undefined): string | null {
+  if (hwid === null || hwid === undefined || hwid === "") return null;
+  return `license:hwid-${(host.hash(hwid) >>> 0).toString(16)}`;
 }
 
 export function native(name: string): (...args: unknown[]) => unknown {

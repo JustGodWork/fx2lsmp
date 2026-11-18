@@ -94,10 +94,10 @@ describe("converted example", () => {
   });
 
   it("handles a leaving player and the restricted console command", async () => {
-    world.server.fire("playerLeave", 2, "Player2", "quit", "bye");
+    world.server.fire("playerLeave", 1, "Player2", "quit", "bye");
     await world.advance(30);
     expect(world.server.logs()).toContain("player 2 left: quit: bye");
-    expect(await world.server.eval("return __runCommand(2, 'greetings')")).toBe("denied");
+    expect(await world.server.eval("return __runCommand(1, 'greetings')")).toBe("denied");
     expect(await world.server.eval("return __runCommand(nil, 'greetings')")).toBe("ok");
     await world.advance(30);
     expect(world.server.logs()).toContain("greetings so far: 1");

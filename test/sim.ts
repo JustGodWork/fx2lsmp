@@ -1,8 +1,9 @@
 export interface PlayerSpec {
   id: number;
   name: string;
-  lsmpId: number;
+  lsmpId: number | null;
   ip: string;
+  hwid?: string;
 }
 
 /** One script environment of the simulated world: a Lua VM or a JS context, with the mock lsmp inside. */

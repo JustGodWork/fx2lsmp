@@ -1,12 +1,12 @@
 ---@diagnostic disable: lowercase-global
 if FXC.side == 'server' then
   local lsmp <const> = lsmp
-  local toPlayerId <const> = FXC.toPlayerId
+  local toLsmp <const>, toFiveM <const> = FXC.toLsmp, FXC.toFiveM
 
   ---@return string[]
   function GetPlayers()
     local out = {}
-    for i, id in ipairs(lsmp.getPlayers()) do out[i] = tostring(id) end
+    for i, id in ipairs(lsmp.getPlayers()) do out[i] = tostring(toFiveM(id)) end
     return out
   end
 
@@ -16,7 +16,7 @@ if FXC.side == 'server' then
   ---@param src integer|string
   ---@return FxPendingConnection?
   local function connecting(src)
-    local id <const> = toPlayerId(src)
+    local id <const> = toLsmp(src)
     return id and pending[id] or nil
   end
 
@@ -25,7 +25,7 @@ if FXC.side == 'server' then
   function GetPlayerName(src)
     local record <const> = connecting(src)
     if record ~= nil then return record.name end
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     return id and lsmp.getPlayerName(id) or nil
   end
 
@@ -35,15 +35,18 @@ if FXC.side == 'server' then
     local out = {}
     local record <const> = connecting(src)
     if record ~= nil then
-      if record.lsmpId ~= nil then out[#out + 1] = 'license:' .. tostring(record.lsmpId) end
+      local license = record.lsmpId ~= nil and 'license:' .. tostring(record.lsmpId) or FXC.guestLicense(record.hwid)
+      if license ~= nil then out[#out + 1] = license end
       if record.ip ~= nil then out[#out + 1] = 'ip:' .. record.ip end
       out[#out + 1] = 'name:' .. record.name
       return out
     end
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     if id == nil then return out end
     local account = lsmp.getPlayerLsmpId(id)
-    if account ~= nil then out[#out + 1] = 'license:' .. tostring(account) end
+    local license = account ~= nil and 'license:' .. tostring(account)
+      or FXC.guestLicense(lsmp.getPlayerIdentifier(id, 'hwid'))
+    if license ~= nil then out[#out + 1] = license end
     local ip = lsmp.getPlayerIdentifier(id, 'ip')
     if ip ~= nil then out[#out + 1] = 'ip:' .. ip end
     local name = lsmp.getPlayerName(id)
@@ -75,7 +78,7 @@ if FXC.side == 'server' then
   ---@param src integer|string
   ---@param reason? string
   function DropPlayer(src, reason)
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     if id ~= nil then lsmp.kickPlayer(id, reason) end
   end
 
@@ -84,7 +87,7 @@ if FXC.side == 'server' then
   ---@return integer
   function GetPlayerPing(src)
     FXC.warnOnce('ping', 'GetPlayerPing: LS:MP has no latency API, a connected player always reports 1')
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     return id ~= nil and lsmp.getPlayerName(id) ~= nil and 1 or 0
   end
 
@@ -98,7 +101,7 @@ if FXC.side == 'server' then
   ---@param src integer|string
   ---@return integer
   function GetPlayerTimeOnline(src)
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     if id == nil or lsmp.getPlayerName(id) == nil then return 0 end
     local since = joinedAt[id]
     if since == nil then
@@ -119,7 +122,7 @@ if FXC.side == 'server' then
   ---@param src integer|string
   ---@return integer
   function GetPlayerPed(src)
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     return id and lsmp.getPlayerPed(id) or 0
   end
 
@@ -146,14 +149,14 @@ if FXC.side == 'server' then
   ---@param src integer|string
   ---@return integer
   function GetPlayerRoutingBucket(src)
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     return id and lsmp.getPlayerDimension(id) or 0
   end
 
   ---@param src integer|string
   ---@param bucket integer
   function SetPlayerRoutingBucket(src, bucket)
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     if id ~= nil then lsmp.setPlayerDimension(id, bucket) end
   end
 
@@ -161,7 +164,7 @@ if FXC.side == 'server' then
   ---@param ace string
   ---@return boolean
   function IsPlayerAceAllowed(src, ace)
-    local id = toPlayerId(src)
+    local id = toLsmp(src)
     return id ~= nil and lsmp.perms.has(id, ace:lower()) == true
   end
 
@@ -270,7 +273,7 @@ if FXC.side == 'server' then
     lsmp.registerCommand(name, opts, function(args, raw, src)
       local rawCommand = name
       if raw ~= nil and raw ~= '' then rawCommand = name .. ' ' .. raw end
-      local id = src or 0
+      local id = src ~= nil and toFiveM(src) or 0
       source = id
       return handler(id, args, rawCommand)
     end)

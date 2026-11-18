@@ -121,13 +121,13 @@ describe("FiveM lifecycle events", () => {
   });
 
   it("builds playerDropped reason and source", async () => {
-    world.server.fire("playerLeave", 2, "Bob", "kick", "bye");
+    world.server.fire("playerLeave", 1, "Bob", "kick", "bye");
     await world.advance(20);
     expect(await world.server.eval("return { ENGINE.dropped.source, ENGINE.dropped.reason }")).toEqual([2, "kick: bye"]);
   });
 
   it("playerJoining receives the id as a string", async () => {
-    world.server.fire("playerJoin", 3, "Cy");
+    world.server.fire("playerJoin", 2, "Cy");
     await world.advance(20);
     expect(await world.server.eval("return { ENGINE.joining.source, ENGINE.joining.oldId }")).toEqual([3, "3"]);
   });
@@ -158,6 +158,30 @@ describe("FiveM lifecycle events", () => {
       return { seen[1] >= 65536, seen[2], seen[3], seen[4] }
     `);
     expect(result).toEqual([true, "Esx", "license:42", "ip:127.0.0.1"]);
+  });
+
+  it("sends a FiveM id N to LS:MP id N - 1", async () => {
+    await world.server.eval("TriggerClientEvent('t:back', 2, 'second only')");
+    await world.advance(30);
+    expect(await world.clients[1]!.eval("return GOT.back.payload")).toBe("second only");
+    expect(await world.clients[0]!.eval("return GOT.back.payload")).not.toBe("second only");
+  });
+
+  it("gives a guest the same hardware license before and after the join", async () => {
+    const result = await world.server.eval<(string | boolean)[]>(`
+      local before
+      AddEventHandler('playerConnecting', function()
+        before = GetPlayerIdentifierByType(source, 'license')
+      end)
+      lsmp.__fire('playerPreConnection', { name = 'Guest', lsmpId = nil, ip = '10.0.0.9', hwid = 'HW-GUEST-1', deny = function() end })
+      Wait(50)
+      __addPlayer(9, 'Guest', nil, '10.0.0.9', 'HW-GUEST-1')
+      local after = GetPlayerIdentifierByType(10, 'license')
+      __addPlayer(10, 'NoHw', nil, '10.0.0.10')
+      return { before, after, before == after, GetPlayerIdentifierByType(11, 'license') == nil }
+    `);
+    expect(result[0]).toMatch(/^license:hwid-[0-9a-f]+$/);
+    expect(result.slice(1)).toEqual([result[0], true, true]);
   });
 
   it("TriggerEvent with a lifecycle name dispatches without emitting", async () => {

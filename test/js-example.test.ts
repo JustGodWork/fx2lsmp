@@ -93,10 +93,10 @@ describe("converted JS example", () => {
   });
 
   it("handles a leaving player and the restricted console command", async () => {
-    js.server.fire("playerLeave", 2, "Player2", "quit", "bye");
+    js.server.fire("playerLeave", 1, "Player2", "quit", "bye");
     await world.advance(30);
     expect(js.server.logs()).toContain("player 2 left: quit: bye");
-    expect(js.server.command(2, "greetings")).toBe("denied");
+    expect(js.server.command(1, "greetings")).toBe("denied");
     expect(js.server.command(null, "greetings")).toBe("ok");
     await world.advance(30);
     expect(js.server.logs()).toContain("greetings so far: 1");

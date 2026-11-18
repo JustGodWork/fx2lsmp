@@ -3,6 +3,7 @@ do
   local lsmp <const> = lsmp
   local side <const> = FXC.side
   local encodeArgs, decodeArgs = FXC.encodeArgs, FXC.decodeArgs
+  local toLsmp <const>, toFiveM <const> = FXC.toLsmp, FXC.toFiveM
 
   ---@class FxEventHandle
   ---@field fn fun(...: any)
@@ -67,13 +68,13 @@ do
       adapt = function(playerId, _, reason, detail)
         local text = tostring(reason)
         if detail ~= nil and detail ~= '' then text = text .. ': ' .. tostring(detail) end
-        return playerId, text
+        return toFiveM(playerId), text
       end,
     }
     ENGINE.playerSpawned = {
       event = 'playerSpawn',
       adapt = function(playerId, position, heading, model)
-        return playerId, { x = position.x, y = position.y, z = position.z, heading = heading, model = model }
+        return toFiveM(playerId), { x = position.x, y = position.y, z = position.z, heading = heading, model = model }
       end,
     }
     --- FiveM passes the temporary connection id as `oldID`.
@@ -84,10 +85,10 @@ do
         for id, record in next, pending do
           if (account ~= nil and record.lsmpId == account) or (account == nil and record.name == name) then
             pending[id] = nil
-            return playerId, tostring(id)
+            return toFiveM(playerId), tostring(id)
           end
         end
-        return playerId, tostring(playerId)
+        return toFiveM(playerId), tostring(toFiveM(playerId))
       end,
     }
     -- Documented for JS only; a Lua subscription loads fine (docs/notes/probe-server.md), a real connection is unverified.
@@ -168,7 +169,7 @@ do
     if netSubscribed[name] then return end
     netSubscribed[name] = true
     if side == 'server' then
-      lsmp.onClient(name, function(src, ...) return dispatch(name, nil, src, decodeArgs(...)) end)
+      lsmp.onClient(name, function(src, ...) return dispatch(name, nil, toFiveM(src), decodeArgs(...)) end)
     else
       lsmp.onServer(name, function(...) return dispatch(name, nil, FXC.SERVER_SOURCE, decodeArgs(...)) end)
     end
@@ -291,7 +292,7 @@ do
     ---@param target integer|string
     ---@param ... any
     function TriggerClientEvent(name, target, ...)
-      local id = FXC.toPlayerId(target)
+      local id = toLsmp(target)
       if id == nil then error("TriggerClientEvent: invalid target '" .. tostring(target) .. "'", 2) end
       local line = (name == 'chatMessage' or name == 'chat:addMessage') and FXCOMPAT_CONFIG.chatBridge ~= false
         and chatLine(name, ...) or nil

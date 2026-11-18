@@ -111,13 +111,10 @@ if FXC.side == 'client' then
     return fn(table.unpack(args, 1, count))
   end
 
-  ---@return integer
-  local function localPlayerId() return lsmp.getLocalPlayer() or 0 end
-
   ---@param serverId integer|string
   ---@return integer
   function GetPlayerFromServerId(serverId)
-    local id = FXC.toPlayerId(serverId)
+    local id = FXC.toLsmp(serverId)
     if id == nil then return -1 end
     if id == lsmp.getLocalPlayer() then return G.PlayerId() end
     local ped = lsmp.getPlayerPed(id)
@@ -131,11 +128,14 @@ if FXC.side == 'client' then
   ---@param slot integer
   ---@return integer
   function GetPlayerServerId(slot)
-    if slot == G.PlayerId() then return localPlayerId() end
+    if slot == G.PlayerId() then
+      local own <const> = lsmp.getLocalPlayer()
+      return own ~= nil and FXC.toFiveM(own) or 0
+    end
     local ped = G.GetPlayerPed(slot)
     if ped == nil or ped == 0 then return 0 end
     for _, id in ipairs(lsmp.getPlayers()) do
-      if lsmp.getPlayerPed(id) == ped then return id end
+      if lsmp.getPlayerPed(id) == ped then return FXC.toFiveM(id) end
     end
     return 0
   end
@@ -144,7 +144,7 @@ if FXC.side == 'client' then
   function GetActivePlayers()
     local out = {}
     for _, id in ipairs(lsmp.getPlayers()) do
-      local slot = GetPlayerFromServerId(id)
+      local slot = GetPlayerFromServerId(FXC.toFiveM(id))
       if slot ~= -1 then out[#out + 1] = slot end
     end
     return out

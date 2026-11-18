@@ -41,8 +41,8 @@ const calls = (vm: JsVm): unknown[][] =>
   vm.natives.filter((n) => HELD.includes(n.name)).map((n) => [n.name, ...n.args.slice(0, n.name === "setEntityCoords" || n.name === "setEntityVelocity" ? 4 : 3)]);
 
 async function adoptJs(res: JsResource, netId: number, player: number): Promise<void> {
-  nth(res.clients, player - 1).owners.set(netId, player);
-  res.server.setOwner(netId, player);
+  nth(res.clients, player - 1).owners.set(netId, player - 1);
+  res.server.setOwner(netId, player - 1);
   await world.advance(300);
 }
 
@@ -120,12 +120,12 @@ describe("orphans and owner changes between JS shims", () => {
   it("ignores a message when the receiving client does not own the entity", async () => {
     const first = nth(jsj.clients, 0);
     const before = calls(first).length;
-    first.owners.set(car, 2);
-    jsj.server.owners.set(car, 1);
+    first.owners.set(car, 1);
+    jsj.server.owners.set(car, 0);
     await jsj.server.eval(`SetEntityHeading(${car}, 5)`);
     await world.advance(3500);
     expect(calls(first).length).toBe(before);
-    jsj.server.owners.set(car, 2);
+    jsj.server.owners.set(car, 1);
   });
 
   it("keeps the last 32 one-shot actions of an orphan", async () => {
@@ -213,8 +213,8 @@ describe("JS server with a Lua client", () => {
       SetVehicleNumberPlateText(v, 'JS 001'); SetEntityCoords(v, 4, 5, 6); GiveWeaponToPed(v, 'weapon_pistol', 30);
       return v;
     `);
-    await luaClient().eval(`lsmp.__test.owners[${car}] = 1`);
-    jsl.server.setOwner(car, 1);
+    await luaClient().eval(`lsmp.__test.owners[${car}] = 0`);
+    jsl.server.setOwner(car, 0);
     await world.advance(300);
     const names = await luaClient().eval<string[]>(
       "local o = {} for _, c in ipairs(lsmp.__test.natives) do o[#o + 1] = c.name end return o",
@@ -238,8 +238,8 @@ describe("Lua server with a JS client", () => {
       SetVehicleNumberPlateText(v, 'LUA 001') SetEntityCoords(v, 4.0, 5.0, 6.0) SetPedArmour(v, 25)
       return v
     `);
-    jsClient().owners.set(car, 1);
-    await luaServer().eval(`lsmp.__test.setOwner(${car}, 1)`);
+    jsClient().owners.set(car, 0);
+    await luaServer().eval(`lsmp.__test.setOwner(${car}, 0)`);
     await world.advance(300);
     const handle = car + 10000;
     expect(calls(jsClient())).toEqual([
@@ -260,8 +260,8 @@ describe("Lua server with a JS client", () => {
     const [mine = 0, theirs = 0] = await luaServer().eval<number[]>(`
       local a = CreateVehicle(901, 0.0, 0.0, 0.0, 0.0)
       local b = CreateVehicle(902, 0.0, 0.0, 0.0, 0.0)
-      lsmp.__test.owners[a] = 1
-      lsmp.__test.owners[b] = 2
+      lsmp.__test.owners[a] = 0
+      lsmp.__test.owners[b] = 1
       return { a, b }
     `);
     await jsClient().eval(`DeleteEntity(${mine + 10000}); DeleteVehicle(${theirs + 10000})`);
@@ -277,8 +277,8 @@ describe("B1 workarounds in JS", () => {
     const [mine = 0, theirs = 0] = await jsj.server.eval<number[]>(`
       return [CreateVehicle(950, 0, 0, 0, 0), CreateVehicle(951, 0, 0, 0, 0)];
     `);
-    jsj.server.owners.set(mine, 1);
-    jsj.server.owners.set(theirs, 2);
+    jsj.server.owners.set(mine, 0);
+    jsj.server.owners.set(theirs, 1);
     client().natives.length = 0;
     await client().eval(`DeleteEntity(${mine + 10000}); DeletePed(${theirs + 10000}); DeleteObject(10999999)`);
     await world.advance(50);
@@ -325,9 +325,9 @@ describe("a client running both shims", () => {
     `);
     const luaClient = nth(dualLua.clients, 0);
     const jsClient = nth(dual.clients, 0);
-    jsClient.owners.set(car, 1);
-    await luaClient.eval(`lsmp.__test.owners[${car}] = 1`);
-    await dualLua.server.eval(`lsmp.__test.setOwner(${car}, 1)`);
+    jsClient.owners.set(car, 0);
+    await luaClient.eval(`lsmp.__test.owners[${car}] = 0`);
+    await dualLua.server.eval(`lsmp.__test.setOwner(${car}, 0)`);
     await world.advance(300);
     expect(calls(jsClient)).toEqual([]);
     const applied = await luaClient.eval<number>(

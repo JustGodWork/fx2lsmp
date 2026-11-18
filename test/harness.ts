@@ -105,8 +105,8 @@ export class Vm implements SimVm {
   }
 
   addPlayer(spec: PlayerSpec): void {
-    const fn: (id: number, name: string, lsmpId: number, ip: string) => void = this.lua.global.get("__addPlayer");
-    fn(spec.id, spec.name, spec.lsmpId, spec.ip);
+    const fn: (id: number, name: string, lsmpId: number | null, ip: string, hwid?: string) => void = this.lua.global.get("__addPlayer");
+    fn(spec.id, spec.name, spec.lsmpId, spec.ip, spec.hwid);
   }
 
   pageResult(id: number, json: string, err: string): void {
@@ -242,7 +242,7 @@ export class World {
     if (opts.storage !== undefined) world.storage = opts.storage;
     const count = opts.clients ?? 1;
     for (let i = 1; i <= count; i++) {
-      world.players.push({ id: i, name: `Player${i}`, lsmpId: 100 + i, ip: `10.0.0.${i}` });
+      world.players.push({ id: i - 1, name: `Player${i}`, lsmpId: 100 + i, ip: `10.0.0.${i}` });
     }
     if (opts.luaMain === false) return world;
     const main = await world.addLua(world.resource, true);

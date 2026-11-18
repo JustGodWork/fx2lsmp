@@ -42,6 +42,7 @@ do
   ---@return string
   local function bagName(scope, target)
     if scope == 'global' then return 'global' end
+    if scope == 'player' then return 'player:' .. (target ~= nil and tostring(FXC.toFiveM(target)) or 'nil') end
     return scope .. ':' .. tostring(target)
   end
 
@@ -213,7 +214,8 @@ do
   ---@param id integer|string
   ---@return FxBagOwner
   function Player(id)
-    local playerId <const> = FXC.toPlayerId(id) or 0
+    local playerId <const> = FXC.toLsmp(id)
+    if playerId == nil then return { state = newBag('player', nil) } end
     local owner = players[playerId]
     if owner == nil then
       owner = { state = newBag('player', playerId) }
@@ -240,7 +242,7 @@ do
       __index = function(_, key)
         if key ~= 'state' then return nil end
         local id <const> = lsmp.getLocalPlayer()
-        return id ~= nil and Player(id).state or nil
+        return id ~= nil and Player(FXC.toFiveM(id)).state or nil
       end,
     })
   end

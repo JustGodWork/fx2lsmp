@@ -512,7 +512,8 @@ export class JsVm implements SimVm {
         if (p === undefined) return null;
         if (kind === "ip") return p.ip;
         if (kind === "name") return p.name;
-        return kind === "lsmp" ? String(p.lsmpId) : null;
+        if (kind === "hwid") return p.hwid ?? null;
+        return kind === "lsmp" && p.lsmpId !== null ? String(p.lsmpId) : null;
       },
       kickPlayer: (id: number, reason?: string) => {
         this.kicks.push({ id, reason });

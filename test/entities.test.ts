@@ -26,8 +26,9 @@ async function natives(index: number): Promise<Call[]> {
 }
 
 async function adopt(netId: number, player: number): Promise<void> {
-  await client(player, `lsmp.__test.owners[${netId}] = ${player}`);
-  await server(`lsmp.__test.setOwner(${netId}, ${player})`);
+  const lsmpId = player - 1;
+  await client(player, `lsmp.__test.owners[${netId}] = ${lsmpId}`);
+  await server(`lsmp.__test.setOwner(${netId}, ${lsmpId})`);
   await world.advance(300);
 }
 
@@ -108,11 +109,11 @@ describe("orphans and owner changes", () => {
 
   it("ignores a message when the receiving client does not own the entity", async () => {
     const before = (await natives(1)).length;
-    await client(1, `lsmp.__test.owners[${car}] = 2`);
-    await server(`lsmp.__test.owners[${car}] = 1 SetEntityHeading(${car}, 5.0)`);
+    await client(1, `lsmp.__test.owners[${car}] = 1`);
+    await server(`lsmp.__test.owners[${car}] = 0 SetEntityHeading(${car}, 5.0)`);
     await world.advance(3500);
     expect((await natives(1)).length).toBe(before);
-    await server(`lsmp.__test.owners[${car}] = 2`);
+    await server(`lsmp.__test.owners[${car}] = 1`);
   });
 
   it("forgets queued actions on resource stop and on delete", async () => {
@@ -252,7 +253,7 @@ describe("server natives used by ESX", () => {
     expect(await server<number[]>("return { GetPlayerTimeOnline(2), GetPlayerTimeOnline(99) }")).toEqual([0, 0]);
     await world.advance(5200);
     expect(await server<number>("return GetPlayerTimeOnline(2)")).toBe(5);
-    world.server.fire("playerLeave", 2, "Player2", "quit", "bye");
+    world.server.fire("playerLeave", 1, "Player2", "quit", "bye");
     expect(await server<number>("return GetPlayerTimeOnline(2)")).toBe(0);
   });
 

@@ -1,5 +1,5 @@
 import { decode, encode } from "./protocol.ts";
-import { clientHost, dropped, expose, host, logError, native, serverHost, side, toPlayerId, warnOnce } from "./runtime.ts";
+import { clientHost, dropped, expose, host, logError, native, serverHost, side, toFiveM, toLsmp, parseInteger, warnOnce } from "./runtime.ts";
 
 type Scope = "global" | "player" | "entity";
 type BagHandler = (bagName: string, key: string, value: unknown, reserved: number, replicated: boolean) => unknown;
@@ -40,7 +40,9 @@ let hooked = false;
 let leaveHooked = false;
 
 function bagName(scope: Scope, target: number | null): string {
-  return scope === "global" ? "global" : `${scope}:${String(target)}`;
+  if (scope === "global") return "global";
+  if (scope === "player") return `player:${target === null ? "null" : String(toFiveM(target))}`;
+  return `${scope}:${String(target)}`;
 }
 
 function dispatch(bag: string, key: string, value: unknown, replicated: boolean): void {
@@ -183,7 +185,8 @@ function newBag(scope: Scope, target: number | null): StateBag {
 }
 
 export function playerOwner(id: unknown): BagOwner {
-  const playerId = toPlayerId(id) ?? 0;
+  const playerId = toLsmp(id);
+  if (playerId === null) return { state: newBag("player", null) };
   let owner = players.get(playerId);
   if (owner === undefined) {
     owner = { state: newBag("player", playerId) };
@@ -193,7 +196,7 @@ export function playerOwner(id: unknown): BagOwner {
 }
 
 function entityOwner(handle: unknown): BagOwner {
-  const netId = side === "server" ? toPlayerId(handle) : typeof handle === "number" ? (clientHost?.getNetIdFromEntity(handle) ?? null) : null;
+  const netId = side === "server" ? parseInteger(handle) : typeof handle === "number" ? (clientHost?.getNetIdFromEntity(handle) ?? null) : null;
   if (netId === null) return { state: newBag("entity", null) };
   let owner = entities.get(netId);
   if (owner === undefined) {
@@ -239,7 +242,7 @@ export function installStateBags(): void {
     expose("LocalPlayer", {
       get state(): StateBag | undefined {
         const id = client.getLocalPlayer();
-        return id === null ? undefined : playerOwner(id).state;
+        return id === null ? undefined : playerOwner(toFiveM(id)).state;
       },
     });
   }

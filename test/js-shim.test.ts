@@ -155,14 +155,14 @@ describe("events", () => {
       ["start", NAME],
       ["sstart", NAME],
       ["stop", NAME],
-      ["joining", 7, "7"],
-      ["dropped", 7, "Timed out: net"],
-      ["spawned", 7, { x: 1, y: 2, z: 3, heading: 90, model: 123 }],
+      ["joining", 8, "8"],
+      ["dropped", 8, "Timed out: net"],
+      ["spawned", 8, { x: 1, y: 2, z: 3, heading: 90, model: 123 }],
       ["connecting", "Bob"],
     ]);
     await first.eval("on('playerSpawned', (d) => { globalThis.spawned = d; }); on('onClientResourceStart', (r) => { globalThis.cstart = r; })");
-    first.fire("playerSpawn", 2, { x: 0, y: 0, z: 0 }, 0, 1);
-    first.fire("playerSpawn", 1, { x: 5, y: 6, z: 7 }, 10, 2);
+    first.fire("playerSpawn", 1, { x: 0, y: 0, z: 0 }, 0, 1);
+    first.fire("playerSpawn", 0, { x: 5, y: 6, z: 7 }, 10, 2);
     first.fire("resourceStart", NAME);
     expect(await first.eval("return [globalThis.spawned, globalThis.cstart]")).toEqual([{ x: 5, y: 6, z: 7, heading: 10, model: 2 }, NAME]);
   });
@@ -300,7 +300,7 @@ describe("server functions", () => {
       null,
       3,
       "license:101",
-      1001,
+      1000,
       0,
     ]);
   });
@@ -328,11 +328,11 @@ describe("server functions", () => {
       RegisterCommand('closed', () => { globalThis.closed = true; }, true);
       RegisterCommand('implicit', () => { globalThis.implicit = true; });
     `);
-    expect(server.command(1, "open a b")).toBe("ok");
-    expect(server.command(1, "closed")).toBe("denied");
-    expect(server.command(1, "implicit")).toBe("ok");
-    server.grant(1, "command.closed");
-    expect(server.command(1, "closed")).toBe("ok");
+    expect(server.command(0, "open a b")).toBe("ok");
+    expect(server.command(0, "closed")).toBe("denied");
+    expect(server.command(0, "implicit")).toBe("ok");
+    server.grant(0, "command.closed");
+    expect(server.command(0, "closed")).toBe("ok");
     expect(server.command(null, "open")).toBe("ok");
     await world.advance(20);
     expect(await server.eval("return [globalThis.closed, globalThis.implicit, GetRegisteredCommands().map((c) => c.name)]")).toEqual([
@@ -340,7 +340,7 @@ describe("server functions", () => {
       true,
       ["open", "closed", "implicit"],
     ]);
-    server.command(1, "open a b");
+    server.command(0, "open a b");
     await world.advance(10);
     expect(await server.eval("return globalThis.cmd")).toEqual([1, ["a", "b"], "open a b", 1]);
     await server.eval("ExecuteCommand('open run')");
@@ -348,11 +348,18 @@ describe("server functions", () => {
     expect(server.commandsRun).toContain("open run");
   });
 
+  it("gives a guest a license from the hardware id and ids shifted by one", async () => {
+    server.addPlayer({ id: 40, name: "Guest", lsmpId: null, ip: "10.0.0.40", hwid: "HW-GUEST-1" });
+    server.addPlayer({ id: 41, name: "NoHw", lsmpId: null, ip: "10.0.0.41" });
+    const result = await server.eval("return [GetPlayerIdentifierByType(41, 'license'), GetPlayerIdentifierByType(42, 'license'), GetPlayers().includes('41')]");
+    expect(result).toEqual([expect.stringMatching(/^license:hwid-[0-9a-f]+$/), null, true]);
+  });
+
   it("checks aces, drops players, routes buckets and performs http requests", async () => {
-    server.grant(1, "admin.use");
+    server.grant(0, "admin.use");
     expect(await server.eval("return [IsPlayerAceAllowed(1, 'Admin.Use'), IsPlayerAceAllowed(2, 'admin.use')]")).toEqual([true, false]);
     await server.eval("DropPlayer(2, 'bye'); SetPlayerRoutingBucket(1, 3);");
-    expect(server.kicks).toEqual([{ id: 2, reason: "bye" }]);
+    expect(server.kicks).toEqual([{ id: 1, reason: "bye" }]);
     expect(await server.eval("return [GetPlayerRoutingBucket(1), GetPlayerRoutingBucket(2)]")).toEqual([3, 0]);
     expect(await server.eval("return await new Promise((r) => PerformHttpRequest('https://example.test/x', (status, body) => r([status, body]), 'POST', '{}', { a: 'b' }))")).toEqual([
       200,
@@ -366,7 +373,7 @@ describe("server functions", () => {
 describe("client natives", () => {
   it("resolves PascalCase names, returns vectors as arrays and keeps the camelCase natives", async () => {
     expect(await first.eval("return [PlayerPedId(), GetEntityCoords(PlayerPedId()), getEntityCoords(1), GetGameTimer() > 0]")).toEqual([
-      501,
+      500,
       [100, 200, 30],
       { x: 100, y: 200, z: 30 },
       true,

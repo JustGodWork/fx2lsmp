@@ -612,8 +612,8 @@ lsmp.__players = {}
 lsmp.__slots = {}
 lsmp.__test = { metaWrites = {}, kicks = {}, grants = {}, coords = {}, dimensions = {}, files = {}, httpRequests = {}, commandsRun = {} }
 
-function __addPlayer(id, name, lsmpId, ip)
-  lsmp.__players[id] = { name = name, lsmpId = lsmpId, ip = ip }
+function __addPlayer(id, name, lsmpId, ip, hwid)
+  lsmp.__players[id] = { name = name, lsmpId = lsmpId, ip = ip, hwid = hwid }
   local slot = 0
   for _ in pairs(lsmp.__slots) do slot = slot + 1 end
   lsmp.__slots[slot] = id
@@ -632,6 +632,7 @@ function lsmp.getPlayerIdentifier(id, kind)
   if p == nil then return nil end
   if kind == 'ip' then return p.ip end
   if kind == 'name' then return p.name end
+  if kind == 'hwid' then return p.hwid end
   if kind == 'lsmp' then return p.lsmpId and tostring(p.lsmpId) or nil end
 end
 function lsmp.getPlayerPed(id)

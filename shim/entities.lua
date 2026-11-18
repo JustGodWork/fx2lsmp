@@ -364,7 +364,7 @@ do
     ---@param src integer|string
     ---@param model integer|string
     function SetPlayerModel(src, model)
-      local id = FXC.toPlayerId(src)
+      local id = FXC.toLsmp(src)
       local hash = toHash(model)
       if id == nil or hash == nil then return end
       send(id, 0, { { op = 'playerModel', model = hash } })
@@ -395,7 +395,10 @@ do
 
     ---@param entity integer
     ---@return integer
-    function NetworkGetEntityOwner(entity) return lsmp.getEntityOwner(entity) or -1 end
+    function NetworkGetEntityOwner(entity)
+      local owner <const> = lsmp.getEntityOwner(entity)
+      return owner ~= nil and FXC.toFiveM(owner) or -1
+    end
 
     --- Asks the owner client; nil outside a host coroutine, without owner or when the owner cannot answer.
     ---@param netId integer
