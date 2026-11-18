@@ -3,7 +3,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { SKIP_DIRS, vendorImports } from "./imports.ts";
 import { buildJsShim } from "./jsShim.ts";
 import { COMPAT_LIBS, isJsScript, type FxManifest, type LsmpManifest, normalizeResourceName, normalizeUiPage, parseFxManifest, toLsmpManifest, usesLuaShim, SERVER_CONVARS_FILE, webuiFolder } from "./manifest.ts";
-import { collectModules, IMPORTS_DIR, LOADER_CLIENT_FILE, LOADER_SERVER_FILE, luaString, renderLoader, type ModuleEntry, withoutRegisteredModules, writeModules } from "./modules.ts";
+import { collectModules, IMPORTS_DIR, LOADER_CLIENT_FILE, LOADER_SERVER_FILE, luaString, MODULES_FILE, renderLoader, type ModuleEntry, withoutRegisteredModules, writeModules } from "./modules.ts";
 import { globToRegExp, listFiles, stageNui } from "./nui.ts";
 import { transpile } from "./transpile.ts";
 
@@ -103,11 +103,26 @@ export function renderServerConvars(convars: Record<string, string>): string {
   return JSON.stringify(convars, null, 2) + "\n";
 }
 
+/**
+ * PascalCase and `N_0x` names in the client code. LS:MP protects the client `_G` metatable, so the shim cannot
+ * resolve FiveM native names lazily: it defines these up front. Names that are not natives resolve to nothing.
+ */
+export function clientNativeNames(outDir: string): string[] {
+  const names = new Set<string>();
+  for (const file of [LOADER_CLIENT_FILE, MODULES_FILE]) {
+    const path = join(outDir, file);
+    if (!existsSync(path)) continue;
+    for (const m of readFileSync(path, "utf8").matchAll(/(?<![.:\w])(?:N_0[xX][0-9A-Fa-f]+|[A-Z][A-Za-z0-9_]*)\b/g)) names.add(m[0]);
+  }
+  return [...names].sort();
+}
+
 export function renderConfig(
   uiPage: string | undefined,
   convars: Record<string, string>,
   kvpPage?: string,
   metadata: Record<string, string[]> = {},
+  natives: readonly string[] = [],
 ): string {
   const metaLines = Object.keys(metadata)
     .sort()
@@ -121,6 +136,7 @@ export function renderConfig(
     "---@field kvpPage string?",
     "---@field convars table<string, string>",
     "---@field metadata table<string, string[]>",
+    "---@field natives string[]?",
     "",
     "---@type FxcompatConfig",
     "FXCOMPAT_CONFIG = {",
@@ -132,6 +148,7 @@ export function renderConfig(
     "  metadata = {",
     ...metaLines,
     "  },",
+    ...(natives.length === 0 ? [] : [`  natives = { ${natives.map(luaString).join(", ")} },`]),
     "}",
     "",
   ].join("\n");
@@ -353,7 +370,7 @@ export async function convertResource(opts: ConvertOptions): Promise<ConvertResu
     writeFileSync(join(outDir, SERVER_CONVARS_FILE), renderServerConvars(serverConvars));
   }
   if (scripts.includes("_fxcompat/init.lua")) {
-    writeFileSync(join(outDir, "_fxcompat", "config.lua"), renderConfig(uiPage, convars, kvpPage, fx.metadata));
+    writeFileSync(join(outDir, "_fxcompat", "config.lua"), renderConfig(uiPage, convars, kvpPage, fx.metadata, clientNativeNames(outDir)));
     writeFileSync(join(outDir, "_fxcompat", "init.lua"), concatShim(shimDir));
   }
   if (scripts.includes("_fxcompat/init.js")) {

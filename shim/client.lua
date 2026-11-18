@@ -35,6 +35,7 @@ if FXC.side == 'client' then
         if first ~= nil and first >= 65 and first <= 90 then
           local alias = aliases[key] or hashAlias(key) or (lower(sub(key, 1, 1)) .. sub(key, 2))
           local fn = rawget(t, alias)
+          if fn == nil then fn = chain(previous, t, alias) end
           if fn ~= nil then
             rawset(t, key, fn)
             return fn
@@ -43,7 +44,19 @@ if FXC.side == 'client' then
       end
       return chain(previous, t, key)
     end
-    if meta ~= nil then meta.__index = resolve else setmetatable(_G, { __index = resolve }) end
+    -- The LS:MP client protects the _G metatable (getmetatable returns a boolean): only the eager pass below works there.
+    if type(meta) == 'table' then
+      pcall(function() meta.__index = resolve end)
+    elseif meta == nil then
+      pcall(setmetatable, _G, { __index = resolve })
+    end
+    for _, key in ipairs(FXCOMPAT_CONFIG.natives or {}) do
+      if rawget(_G, key) == nil then
+        local alias = aliases[key] or hashAlias(key) or (lower(sub(key, 1, 1)) .. sub(key, 2))
+        local ok, fn = pcall(function() return _G[alias] end)
+        if ok and type(fn) == 'function' then rawset(_G, key, fn) end
+      end
+    end
   end
 
   ---@type table<string, fun(...: any): ...>

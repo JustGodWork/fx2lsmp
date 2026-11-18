@@ -37,6 +37,16 @@ describe("promise globals", () => {
     ).toEqual([7, "b"]);
   });
 
+  it("accepts the colon form promise:new()", async () => {
+    expect(
+      await world.server.eval(`
+        local p = promise:new()
+        SetTimeout(10, function() p:resolve('ok') end)
+        return Citizen.Await(p)
+      `),
+    ).toBe("ok");
+  });
+
   it("raises the rejection reason", async () => {
     expect(
       await world.server.eval(`

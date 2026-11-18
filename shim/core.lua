@@ -106,6 +106,7 @@ __fxc_nil = setmetatable({}, { __newindex = function() end })
 ---@field applyEntities boolean?
 ---@field convars table<string, string>
 ---@field metadata table<string, string[]>?
+---@field natives string[]? FiveM native names the client code uses, defined up front when the _G metatable is protected
 ---@field chatBridge boolean?
 ---@field expose boolean?
 
