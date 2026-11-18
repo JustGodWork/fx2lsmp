@@ -8,6 +8,7 @@
     "test": "vitest run",
     "typecheck": "tsc -p .",
     "lint:lua": "tsx tools/lint-lua.ts",
+    "cfx:coverage": "tsx tools/cfx_coverage.ts",
     "lsmp:smoke": "tsx tools/lsmp-smoke.ts"
   },
   "devDependencies": {

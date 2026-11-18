@@ -6,6 +6,7 @@ import { COMPAT_LIBS, isJsScript, type FxManifest, type LsmpManifest, normalizeR
 import { collectModules, IMPORTS_DIR, LOADER_CLIENT_FILE, LOADER_SERVER_FILE, luaString, MODULES_FILE, renderLoader, type ModuleEntry, withoutRegisteredModules, writeModules } from "./modules.ts";
 import { globToRegExp, listFiles, stageNui } from "./nui.ts";
 import { transpile } from "./transpile.ts";
+import { calledNames, capitalisedNames, coverageWarnings, definedInFiles, loadCatalogueNames, loadCfxData, serverNativeNames, type CfxData, type Runtime, type UsedNames } from "./cfxCoverage.ts";
 
 export { luaString };
 
@@ -115,6 +116,41 @@ export function clientNativeNames(outDir: string): string[] {
     for (const m of readFileSync(path, "utf8").matchAll(/(?<![.:\w])(?:N_0[xX][0-9A-Fa-f]+|[A-Z][A-Za-z0-9_]*)\b/g)) names.add(m[0]);
   }
   return [...names].sort();
+}
+
+/** Coverage warnings for the Lua loaders and the JS scripts a converted resource ships. */
+export function nativeCoverageWarnings(
+  outDir: string,
+  fx: FxManifest,
+  luaShim: boolean,
+  data: CfxData = loadCfxData(),
+  catalogue: ReadonlySet<string> = loadCatalogueNames(),
+): string[] {
+  const used: UsedNames[] = [];
+  if (luaShim) {
+    // the module registry is shared by both sides and holds text loaded on demand: only the loaders count as use
+    const clientCalls = calledNames(outDir, [LOADER_CLIENT_FILE], "lua");
+    const serverCalls = calledNames(outDir, [LOADER_SERVER_FILE], "lua");
+    used.push({ runtime: "lua.client", names: clientNativeNames(outDir).filter((n) => clientCalls.has(n)), defined: definedInFiles(outDir, [LOADER_CLIENT_FILE]) });
+    used.push({ runtime: "lua.server", names: serverNativeNames(outDir).filter((n) => serverCalls.has(n)), defined: definedInFiles(outDir, [LOADER_SERVER_FILE]) });
+  }
+  const present = existsSync(outDir) ? listFiles(outDir) : [];
+  const jsFiles = (scripts: readonly string[]): string[] => {
+    const matchers = scripts.filter(isJsScript).map(globToRegExp);
+    return present.filter((file) => matchers.some((m) => m.test(file)));
+  };
+  const jsSides: [Runtime, readonly string[]][] = [
+    ["js.client", [...fx.sharedScripts, ...fx.clientScripts]],
+    ["js.server", [...fx.sharedScripts, ...fx.serverScripts]],
+  ];
+  for (const [runtime, scripts] of jsSides) {
+    const files = jsFiles(scripts);
+    if (files.length === 0) continue;
+    const calls = calledNames(outDir, files, "js");
+    used.push({ runtime, names: [...capitalisedNames(outDir, files)].filter((n) => calls.has(n)).sort(), defined: definedInFiles(outDir, files) });
+  }
+  if (used.length === 0) return [];
+  return coverageWarnings(data, catalogue, used);
 }
 
 export function renderConfig(
@@ -384,6 +420,7 @@ export async function convertResource(opts: ConvertOptions): Promise<ConvertResu
     writeFileSync(join(outDir, "_fxcompat", "init.js"), await buildJsShim(shimDir, jsUsesHashes));
   }
   writeFileSync(join(outDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  warnings.push(...nativeCoverageWarnings(outDir, fx, luaShim));
   return { name, warnings };
 }
 
