@@ -28,6 +28,8 @@ const CLIENT = `
   end)
   RegisterNUICallback('slow', function(data, cb) SetTimeout(100, function() cb('later') end) end)
   RegisterNuiCallback('sparse', function(data, cb) cb({ [3] = 'x', names = { 'a' } }) end)
+  RegisterNuiCallbackType('typed')
+  AddEventHandler('__cfx_nui:typed', function(data, cb) cb({ n = data.n + 1 }) end)
 `;
 
 let world: World;
@@ -132,6 +134,12 @@ describe("NUI", () => {
     const answer = world.page().run("window.postTo('sparse', {})");
     await world.advance(50);
     expect(await answer).toEqual({ "3": "x", names: ["a"] });
+  });
+
+  it("routes a RegisterNuiCallbackType call to its __cfx_nui event handler", async () => {
+    const answer = world.page().run("window.postTo('typed', { n: 1 })");
+    await world.advance(50);
+    expect(await answer).toEqual({ n: 2 });
   });
 
   it("maps SetNuiFocus options to browser focus", async () => {

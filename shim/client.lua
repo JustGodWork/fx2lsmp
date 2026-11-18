@@ -268,6 +268,15 @@ if FXC.side == 'client' then
   end
   RegisterNuiCallback = RegisterNUICallback
 
+  --- The page calls then reach `AddEventHandler('__cfx_nui:' .. name, function(data, cb) end)`.
+  ---@param name string
+  function RegisterNuiCallbackType(name)
+    if callbacks[name] == nil then
+      callbacks[name] = function(data, cb) FXC.dispatchInVm('__cfx_nui:' .. name, data, cb) end
+    end
+    nuiBrowser()
+  end
+
   ---@class FxRawNuiRequest
   ---@field resource string
   ---@field path string

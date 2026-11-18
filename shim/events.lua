@@ -148,6 +148,11 @@ do
   ---@param ... any
   local function dispatchLocal(name, invoker, ...) return dispatch(name, invoker, nil, decodeArgs(...)) end
 
+  --- Runs the handlers in this VM with the arguments as they are: functions survive, unlike a TriggerEvent payload.
+  ---@param name string
+  ---@param ... any
+  function FXC.dispatchInVm(name, ...) return dispatch(name, nil, nil, ...) end
+
   ---@param name string
   local function subscribeLocal(name)
     if localSubscribed[name] then return end

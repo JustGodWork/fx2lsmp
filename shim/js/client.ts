@@ -5,6 +5,20 @@ import { clientHost, config, expose, logError, native, resource, toFiveM, toLsmp
 type Command = (source: number, args: string[], rawCommand: string) => unknown;
 type Handler = (...args: unknown[]) => unknown;
 
+interface RawNuiRequest {
+  resource: string;
+  path: string;
+  method: string;
+  headers: Record<string, string>;
+  body: string;
+}
+
+interface RawNuiResponse {
+  body?: string;
+  status?: number;
+  headers?: Record<string, string>;
+}
+
 const NUI_TIMEOUT_MS = 15000;
 const MAX_SLOT = 63;
 
@@ -105,6 +119,21 @@ function installNui(client: LsmpClient): void {
   };
   expose("RegisterNUICallback", registerCallback);
   expose("RegisterNuiCallback", registerCallback);
+  // the handler gets the page data as JSON text; the body of its answer is decoded before it reaches the page
+  expose("RegisterRawNuiCallback", (name: string, fn: (request: RawNuiRequest, cb: (response?: RawNuiResponse) => void) => unknown) => {
+    registerCallback(name, (data: unknown, cb: unknown) => {
+      const reply = typeof cb === "function" ? (value?: unknown): unknown => Reflect.apply(cb, undefined, [value]) : (): void => {};
+      fn({ resource, path: `/${name}`, method: "POST", headers: {}, body: JSON.stringify(data ?? null) }, (response) => {
+        const body = response?.body;
+        if (body === undefined) return void reply();
+        try {
+          reply(JSON.parse(body));
+        } catch {
+          reply(body);
+        }
+      });
+    });
+  });
   expose("SendNUIMessage", (data: unknown) => nuiBrowser(client)?.emit(NUI_EVENT, toJson(data)) ?? false);
   const applyFocus = (): void => {
     const b = nuiBrowser(client);

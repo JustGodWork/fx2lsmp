@@ -229,6 +229,8 @@ if FXC.side == 'server' then
 
   ---@param key string
   function DeleteResourceKvp(key) lsmp.storage.delete(key) end
+  DeleteResourceKvpNoSync = DeleteResourceKvp
+  function FlushResourceKvp() end
 
   ---@class FxServerKvpFind
   ---@field keys string[]

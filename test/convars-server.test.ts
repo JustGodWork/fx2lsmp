@@ -33,6 +33,10 @@ describe("server convar and server info natives", () => {
     expect(await world.server.eval("SetConvar('onesync', 'legacy') return GetConvar('onesync', 'off')")).toBe("legacy");
   });
 
+  it("deletes and flushes KVP with the NoSync forms on the server", async () => {
+    expect(await world.server.eval("SetResourceKvp('k', 'v') DeleteResourceKvpNoSync('k') FlushResourceKvp() return GetResourceKvpString('k')")).toBeNull();
+  });
+
   it("leaves them undefined on the client", async () => {
     for (const name of NAMES) {
       expect(await world.clients[0]!.eval(`return type(${name})`)).toBe("nil");

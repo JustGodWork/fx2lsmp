@@ -281,6 +281,18 @@ describe("shared functions", () => {
   });
 });
 
+describe("server convar and server info natives", () => {
+  it("reads back a convar set at runtime and accepts the server info setters", async () => {
+    expect(await server.eval("SetConvar('runtime', '1'); SetConvarReplicated('r', '2'); SetConvarServerInfo('i', '3'); return [GetConvar('runtime', 'd'), GetConvarInt('r'), GetConvar('i')]")).toEqual(["1", 2, "3"]);
+    expect(await server.eval("SetMapName('m'); SetGameType('g'); SetEntityOrphanMode(1, 2); return true")).toBe(true);
+    expect(await first.eval("return [typeof SetConvar, typeof SetMapName]")).toEqual(["undefined", "undefined"]);
+  });
+
+  it("deletes and flushes KVP with the NoSync forms", async () => {
+    expect(await server.eval("SetResourceKvp('k', 'v'); DeleteResourceKvpNoSync('k'); FlushResourceKvp(); return GetResourceKvpString('k')")).toBeNull();
+  });
+});
+
 describe("server functions", () => {
   it("lists players and their identifiers", async () => {
     const result = await server.eval(`
@@ -473,6 +485,8 @@ describe("NUI", () => {
       RegisterNUICallback('slow', (data, cb) => { setTimeout(() => cb('later'), 100); });
       RegisterNUICallback('none', () => {});
       RegisterNUICallback('sparse', (data, cb) => cb({ 3: 'x', names: ['a'] }));
+      RegisterRawNuiCallback('raw', (request, cb) => cb({ body: JSON.stringify({ body: request.body, path: request.path }) }));
+      RegisterRawNuiCallback('rawText', (request, cb) => cb({ body: 'plain' }));
     `);
     expect(await first.eval("return SendNUIMessage({ type: 'hi', f() {}, u: undefined, d: [1, undefined] })")).toBe(true);
     await world.advance(20);
@@ -489,6 +503,8 @@ describe("NUI", () => {
     expect(await call("slow", {})).toBe("later");
     expect(await call("none", {}, 15100)).toBeNull();
     expect(await call("sparse", {})).toEqual({ "3": "x", names: ["a"] });
+    expect(await call("raw", { n: 2 })).toEqual({ body: '{"n":2}', path: "/raw" });
+    expect(await call("rawText", {})).toBe("plain");
     expect(await first.eval("return [IsNuiFocused(), nui.close]")).toEqual([false, { reason: "button" }]);
   });
 

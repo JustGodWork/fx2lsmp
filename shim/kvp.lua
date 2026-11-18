@@ -151,6 +151,7 @@ if FXC.side == 'client' then
     touched[key] = true
     write('kvp:del', key)
   end
+  DeleteResourceKvpNoSync = DeleteResourceKvp
 
   ---@class FxKvpFind
   ---@field keys string[]

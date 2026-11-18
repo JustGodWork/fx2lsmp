@@ -94,7 +94,12 @@ const BUILTIN_CONVARS: Readonly<Record<string, string>> = {
   gamename: "gta5",
 };
 
+/** Values set at runtime stay in this resource: LS:MP has no shared convar store. */
+const runtimeConvars = new Map<string, string>();
+
 function convar(name: string): string | undefined {
+  const set = runtimeConvars.get(name);
+  if (set !== undefined) return set;
   if (side === "server") {
     const value = loadServerConvars().get(name);
     if (value !== undefined) return value;
@@ -125,6 +130,16 @@ export function installCore(): void {
     const value = convar(name);
     return value === undefined ? (fallback ?? false) : value === "true" || value === "1";
   });
+  if (side === "server") {
+    const setConvar = (name: string, value: unknown): void => void runtimeConvars.set(name, String(value));
+    expose("SetConvar", setConvar);
+    expose("SetConvarReplicated", setConvar);
+    expose("SetConvarServerInfo", setConvar);
+    // LS:MP has no server list map or game type field, and sets the entity life policy at creation only
+    expose("SetMapName", () => {});
+    expose("SetGameType", () => {});
+    expose("SetEntityOrphanMode", () => {});
+  }
   expose("GetNumResourceMetadata", (name: string, key: string) => metadataOf(name, key).length);
   expose("GetResourceMetadata", (name: string, key: string, index?: number) => metadataOf(name, key)[index ?? 0] ?? null);
   expose("GetNumResources", () => 1);
