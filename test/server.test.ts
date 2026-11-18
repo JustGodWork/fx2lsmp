@@ -33,6 +33,20 @@ describe("players", () => {
     expect(await server("return { GetNumPlayerIdentifiers(1), GetPlayerIdentifier(1, 1) }")).toEqual([3, "ip:10.0.0.1"]);
   });
 
+  it("keeps a guest's identifiers readable in playerDropped once LS:MP stops answering", async () => {
+    world.server.addPlayer({ id: 40, name: "Guest", lsmpId: null, ip: "10.0.0.40", hwid: "HW-GUEST-1" });
+    await server("AddEventHandler('playerDropped', function() DROPPED_LICENSE = GetPlayerIdentifierByType(source, 'license') end)");
+    world.server.fire("playerJoin", 40, "Guest");
+    await world.advance(10);
+    const license = await server("return GetPlayerIdentifierByType(41, 'license')");
+    expect(license).toMatch(/^license:hwid-[0-9a-f]+$/);
+    await server("lsmp.__players[40] = nil");
+    world.server.fire("playerLeave", 40, "Guest", "timeout", "");
+    await world.advance(10);
+    expect(await server("return DROPPED_LICENSE")).toBe(license);
+    expect(await server("return GetPlayerIdentifierByType(41, 'license') == nil")).toBe(true);
+  });
+
   it("covers entities, routing buckets, ACE and DropPlayer", async () => {
     expect(await server("local c = GetEntityCoords(GetPlayerPed(1)) return { GetPlayerPed(2), c.x, c.z }")).toEqual([1001, 1, 3]);
     expect(await server("return { NetworkGetNetworkIdFromEntity(55), NetworkGetEntityFromNetworkId(55) }")).toEqual([55, 55]);

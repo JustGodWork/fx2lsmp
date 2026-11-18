@@ -355,6 +355,20 @@ describe("server functions", () => {
     expect(result).toEqual([expect.stringMatching(/^license:hwid-[0-9a-f]+$/), null, true]);
   });
 
+  it("keeps a guest's identifiers readable in playerDropped once LS:MP stops answering", async () => {
+    server.addPlayer({ id: 50, name: "Leaver", lsmpId: null, ip: "10.0.0.50", hwid: "HW-GUEST-2" });
+    await server.eval("on('playerDropped', () => { globalThis.droppedLicense = GetPlayerIdentifierByType(source, 'license'); }); return null");
+    server.fire("playerJoin", 50, "Leaver");
+    await world.advance(10);
+    const license = await server.eval("return GetPlayerIdentifierByType(51, 'license')");
+    expect(license).toMatch(/^license:hwid-[0-9a-f]+$/);
+    server.removePlayer(50);
+    server.fire("playerLeave", 50, "Leaver", "timeout", "");
+    await world.advance(10);
+    expect(await server.eval("return globalThis.droppedLicense")).toBe(license);
+    expect(await server.eval("return GetPlayerIdentifierByType(51, 'license')")).toBe(null);
+  });
+
   it("checks aces, drops players, routes buckets and performs http requests", async () => {
     server.grant(0, "admin.use");
     expect(await server.eval("return [IsPlayerAceAllowed(1, 'Admin.Use'), IsPlayerAceAllowed(2, 'admin.use')]")).toEqual([true, false]);

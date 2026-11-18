@@ -105,8 +105,8 @@ export class Vm implements SimVm {
   }
 
   addPlayer(spec: PlayerSpec): void {
-    const fn: (id: number, name: string, lsmpId: number | null, ip: string, hwid?: string) => void = this.lua.global.get("__addPlayer");
-    fn(spec.id, spec.name, spec.lsmpId, spec.ip, spec.hwid);
+    const fn: (id: number, name: string, lsmpId: number | undefined, ip: string, hwid?: string) => void = this.lua.global.get("__addPlayer");
+    fn(spec.id, spec.name, spec.lsmpId ?? undefined, spec.ip, spec.hwid);
   }
 
   pageResult(id: number, json: string, err: string): void {

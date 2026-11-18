@@ -29,6 +29,10 @@ if FXC.side == 'server' then
     return id and lsmp.getPlayerName(id) or nil
   end
 
+  --- FiveM still answers the identifier natives inside `playerDropped`; LS:MP may not once the player is leaving.
+  ---@type table<integer, string[]>
+  local lastIdentifiers <const> = {}
+
   ---@param src integer|string
   ---@return string[]
   function GetPlayerIdentifiers(src)
@@ -46,13 +50,22 @@ if FXC.side == 'server' then
     local account = lsmp.getPlayerLsmpId(id)
     local license = account ~= nil and 'license:' .. tostring(account)
       or FXC.guestLicense(lsmp.getPlayerIdentifier(id, 'hwid'))
+    local known <const> = lastIdentifiers[id]
+    if license == nil and known ~= nil then return table.move(known, 1, #known, 1, {}) end
     if license ~= nil then out[#out + 1] = license end
     local ip = lsmp.getPlayerIdentifier(id, 'ip')
     if ip ~= nil then out[#out + 1] = 'ip:' .. ip end
     local name = lsmp.getPlayerName(id)
     if name ~= nil then out[#out + 1] = 'name:' .. name end
+    if license ~= nil then lastIdentifiers[id] = table.move(out, 1, #out, 1, {}) end
     return out
   end
+
+  lsmp.on('playerJoin', function(playerId) GetPlayerIdentifiers(toFiveM(playerId)) end)
+  -- Cleared after the dispatch, so every playerDropped handler still reads them.
+  lsmp.on('playerLeave', function(playerId)
+    setTimeout(function() lastIdentifiers[playerId] = nil end, 0)
+  end)
 
   ---@param src integer|string
   ---@param kind string

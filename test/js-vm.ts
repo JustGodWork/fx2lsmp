@@ -712,6 +712,10 @@ export class JsVm implements SimVm {
     this.players.set(spec.id, spec);
   }
 
+  removePlayer(id: number): void {
+    this.players.delete(id);
+  }
+
   setFile(path: string, content: string): void {
     this.files.set(path, content);
   }

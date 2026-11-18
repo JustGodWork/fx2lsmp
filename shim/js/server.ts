@@ -9,17 +9,23 @@ function playerOf(src: unknown): number | null {
   return toLsmp(src);
 }
 
+// FiveM still answers the identifier natives inside playerDropped; LS:MP may not once the player is leaving.
+const lastIdentifiers = new Map<number, string[]>();
+
 function identifiersOf(server: LsmpServer, src: unknown): string[] {
   const id = playerOf(src);
   const out: string[] = [];
   if (id === null) return out;
   const account = server.getPlayerLsmpId(id);
   const license = account !== null && account !== undefined ? `license:${String(account)}` : guestLicense(server.getPlayerIdentifier(id, "hwid"));
+  const known = lastIdentifiers.get(id);
+  if (license === null && known !== undefined) return [...known];
   if (license !== null) out.push(license);
   const ip = server.getPlayerIdentifier(id, "ip");
   if (ip !== null && ip !== undefined) out.push(`ip:${ip}`);
   const name = server.getPlayerName(id);
   if (name !== null && name !== undefined) out.push(`name:${name}`);
+  if (license !== null) lastIdentifiers.set(id, [...out]);
   return out;
 }
 
@@ -90,10 +96,15 @@ function installPlayers(server: LsmpServer): void {
   });
   const joinedAt = new Map<number, number>();
   host.on("playerJoin", (id) => {
-    if (typeof id === "number") joinedAt.set(id, host.getTickCount());
+    if (typeof id !== "number") return;
+    joinedAt.set(id, host.getTickCount());
+    identifiers(toFiveM(id));
   });
   host.on("playerLeave", (id) => {
-    if (typeof id === "number") joinedAt.delete(id);
+    if (typeof id !== "number") return;
+    joinedAt.delete(id);
+    // cleared after the dispatch, so every playerDropped handler still reads them
+    setTimeout(() => lastIdentifiers.delete(id), 0);
   });
   // seconds since the join, counted from the first sighting for players present before the shim loaded
   expose("GetPlayerTimeOnline", (src: unknown) => {
