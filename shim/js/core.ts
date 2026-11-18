@@ -86,12 +86,20 @@ function loadServerConvars(): Map<string, string> {
   return serverConvars;
 }
 
+/** FiveM built-in convars scripts check: LS:MP syncs every entity through its server, like OneSync Infinity. */
+const BUILTIN_CONVARS: Readonly<Record<string, string>> = {
+  onesync: "on",
+  onesync_enabled: "true",
+  onesync_enableInfinity: "true",
+  gamename: "gta5",
+};
+
 function convar(name: string): string | undefined {
   if (side === "server") {
     const value = loadServerConvars().get(name);
     if (value !== undefined) return value;
   }
-  return config.convars[name];
+  return config.convars[name] ?? BUILTIN_CONVARS[name];
 }
 
 export function installCore(): void {

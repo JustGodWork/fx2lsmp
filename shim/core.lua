@@ -751,6 +751,15 @@ do
     function SetEntityOrphanMode(_entity, _mode) end
   end
 
+  --- FiveM built-in convars scripts check: LS:MP syncs every entity through its server, like OneSync Infinity.
+  ---@type table<string, string>
+  local builtinConvars <const> = {
+    onesync = 'on',
+    onesync_enabled = 'true',
+    onesync_enableInfinity = 'true',
+    gamename = 'gta5',
+  }
+
   --- Convars come from the build (server.cfg): the client only gets the replicated ones (`setr`).
   ---@param name string
   ---@return string?
@@ -761,7 +770,9 @@ do
       local value <const> = loadServerConvars()[name]
       if value ~= nil then return value end
     end
-    return FXCOMPAT_CONFIG.convars[name]
+    local replicated <const> = FXCOMPAT_CONFIG.convars[name]
+    if replicated ~= nil then return replicated end
+    return builtinConvars[name]
   end
 
   ---@param name string

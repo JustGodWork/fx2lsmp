@@ -27,6 +27,12 @@ describe("server convar and server info natives", () => {
     ).toBe(true);
   });
 
+  it("reports OneSync Infinity on both sides", async () => {
+    expect(await world.server.eval("return GetConvar('onesync', 'off')")).toBe("on");
+    expect(await world.clients[0]!.eval("return GetConvar('onesync', 'off')")).toBe("on");
+    expect(await world.server.eval("SetConvar('onesync', 'legacy') return GetConvar('onesync', 'off')")).toBe("legacy");
+  });
+
   it("leaves them undefined on the client", async () => {
     for (const name of NAMES) {
       expect(await world.clients[0]!.eval(`return type(${name})`)).toBe("nil");
