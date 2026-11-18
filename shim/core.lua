@@ -29,6 +29,8 @@
 ---@field registerModule fun(path: string, hash: string, factory: FxModuleFactory)
 ---@field registry fun(file: string): fun(path: string, hash: string, factory: FxModuleFactory, firstLine?: integer)
 ---@field moduleHash fun(text: string): string
+---@field script fun(file: string, path: string, body: fun(...: any), firstLine: integer)
+---@field run fun(file: string)
 ---@field vector2 fun(x?: number, y?: number): FxVector2
 ---@field vector4 fun(x?: number, y?: number, z?: number, w?: number): FxVector4
 local FXC <const> = {}
@@ -931,6 +933,48 @@ do
     end
     return path, line
   end
+
+  ---@class FxScript
+  ---@field path string
+  ---@field body fun(...: any)
+
+  ---@type table<string, FxScript[]>
+  local scriptsByFile <const> = {}
+
+  --- Adds one Lua script of the resource to the loader `file` and records where its body starts.
+  ---@param file string
+  ---@param path string
+  ---@param body fun(...: any)
+  ---@param firstLine integer
+  function FXC.script(file, path, body, firstLine)
+    local list = scriptsByFile[file]
+    if list == nil then
+      list = {}
+      scriptsByFile[file] = list
+      rangesByFile[file] = {}
+    end
+    list[#list + 1] = { path = path, body = body }
+    local ranges <const> = rangesByFile[file]
+    ranges[#ranges + 1] = { first = firstLine, path = path }
+  end
+  _G.__fxc_script = FXC.script
+
+  --- Runs the scripts in manifest order in the calling coroutine; an error names the original file and line.
+  ---@param file string
+  function FXC.run(file)
+    local list <const> = scriptsByFile[file] or {}
+    for i = 1, #list do
+      local ok <const>, err <const> = pcall(list[i].body)
+      if not ok then
+        if type(err) ~= 'string' then error(err, 0) end
+        error((string.gsub(err, '([^%s:]+):(%d+):', function(path, line)
+          local mapped <const>, mappedLine <const> = unmapModule(path, tonumber(line) or -1)
+          return mapped .. ':' .. mappedLine .. ':'
+        end)), 0)
+      end
+    end
+  end
+  _G.__fxc_run = FXC.run
 
   ---@param frame string
   ---@return FxDebugInfo

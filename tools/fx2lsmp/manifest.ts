@@ -1,6 +1,6 @@
 import { LuaFactory } from "wasmoon";
 import { posix } from "node:path";
-import { MODULES_FILE, MODULES_SERVER_FILE } from "./modules.ts";
+import { LOADER_CLIENT_FILE, LOADER_SERVER_FILE, MODULES_FILE, MODULES_SERVER_FILE } from "./modules.ts";
 
 export interface DataFile {
   path: string;
@@ -249,7 +249,26 @@ export function usesLuaShim(fx: FxManifest): boolean {
   return !all.some(isJsScript) || all.some((s) => !isJsScript(s));
 }
 
-export function toLsmpManifest(fx: FxManifest, name: string, modules: ModuleFlags = { client: false, server: false }): LsmpManifest {
+/** Replaces the run of Lua scripts of `list` by `loader`, put where the first of them stood. */
+function withLoader(list: readonly string[], loader: string): string[] {
+  const out: string[] = [];
+  let placed = false;
+  for (const script of list) {
+    if (isJsScript(script)) out.push(script);
+    else if (!placed) {
+      out.push(loader);
+      placed = true;
+    }
+  }
+  return out;
+}
+
+/**
+ * `loaders` replaces the Lua scripts of each side by one generated script (see renderLoader), which needs
+ * `modules_server.lua` and the client registry to stay ahead of it; the manifest scripts are then only the shim, the
+ * registries, JS scripts and the loaders.
+ */
+export function toLsmpManifest(fx: FxManifest, name: string, modules: ModuleFlags = { client: false, server: false }, loaders = false): LsmpManifest {
   const warnings = fx.warnings;
   const uiPage = fx.uiPage === undefined ? undefined : normalizeUiPage(fx.uiPage, name, warnings);
   // a client resource always gets a webui folder: it carries the hidden KVP page
@@ -262,28 +281,36 @@ export function toLsmpManifest(fx: FxManifest, name: string, modules: ModuleFlag
   const jsServer = fx.serverScripts.some(isJsScript);
   // the JS shim must precede the shared scripts, so it travels with them unless one side alone needs it
   const jsInShared = jsShared || (jsClient && jsServer);
+  const useLoaders = loaders && luaShim;
+  const luaAt = (list: readonly string[]): boolean => list.some((s) => !isJsScript(s));
+  const clientLoader = useLoaders && luaAt([...fx.sharedScripts, ...fx.clientScripts]);
+  const serverLoader = useLoaders && luaAt([...fx.sharedScripts, ...fx.serverScripts]);
   // modules_server.lua must run before the shared scripts on the server, so they move to each side's own list
-  const serverFirst = luaShim && modules.server;
+  const serverFirst = luaShim && modules.server && !useLoaders;
   const manifest: LsmpManifest = {
     title: name,
     shared_scripts: [
       ...(luaShim ? LUA_SHIM_SCRIPTS : []),
       ...(luaShim && modules.client ? [MODULES_FILE] : []),
       ...(jsInShared ? JS_SHIM_SCRIPTS : []),
-      ...(serverFirst ? [] : fx.sharedScripts),
+      ...(serverFirst ? [] : useLoaders ? fx.sharedScripts.filter(isJsScript) : fx.sharedScripts),
     ],
   };
   if (fx.description !== undefined) manifest.description = fx.description;
   if (fx.author !== undefined) manifest.author = fx.author;
   if (fx.version !== undefined) manifest.version = fx.version;
   const moved = serverFirst ? fx.sharedScripts : [];
-  if (fx.clientScripts.length > 0 || moved.length > 0) {
+  const luaShared = fx.sharedScripts.filter((script) => !isJsScript(script));
+  if (fx.clientScripts.length > 0 || moved.length > 0 || clientLoader) {
     const shim = jsClient && !jsInShared ? JS_SHIM_SCRIPTS : [];
-    manifest.client_scripts = [...shim, ...moved, ...fx.clientScripts];
+    const own = clientLoader ? withLoader([...luaShared, ...fx.clientScripts], LOADER_CLIENT_FILE) : fx.clientScripts;
+    manifest.client_scripts = [...shim, ...moved, ...own];
   }
   if (fx.serverScripts.length > 0 || fx.sharedScripts.length > 0 || serverFirst) {
     const shim = jsServer && !jsInShared ? JS_SHIM_SCRIPTS : [];
-    manifest.server_scripts = [...shim, ...(serverFirst ? [MODULES_SERVER_FILE] : []), ...moved, ...fx.serverScripts];
+    const own = serverLoader ? withLoader([...luaShared, ...fx.serverScripts], LOADER_SERVER_FILE) : fx.serverScripts;
+    const registry = serverFirst || (useLoaders && modules.server) ? [MODULES_SERVER_FILE] : [];
+    manifest.server_scripts = [...shim, ...registry, ...moved, ...own];
   }
   if (files.length > 0) manifest.files = files;
   if (webui !== undefined) manifest.webui = [webui];

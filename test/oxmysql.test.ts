@@ -38,6 +38,7 @@ interface Booted {
   app: Vm;
   warnings: string[];
   appManifest: { server_scripts: string[] };
+  appLoader: string;
 }
 
 function convertedManifest(dir: string): { shared_scripts: string[]; server_scripts?: string[] } {
@@ -73,7 +74,7 @@ async function boot(connection: string): Promise<Booted> {
     lua.server.load(path, readFileSync(join(appDir, path), "utf8"));
   }
   await world.advance(60);
-  return { world, db: world.server, app: lua.server, warnings: converted.warnings, appManifest: { server_scripts: appManifest.server_scripts ?? [] } };
+  return { world, db: world.server, app: lua.server, warnings: converted.warnings, appManifest: { server_scripts: appManifest.server_scripts ?? [] }, appLoader: readFileSync(join(appDir, "_fxcompat/run_server.lua"), "utf8") };
 }
 
 interface Logged {
@@ -101,7 +102,8 @@ afterAll(() => ctx.world.close());
 
 describe("oxmysql compat: setup", () => {
   it("fx2lsmp replaces the cross-resource lib and warns about the unsandboxed requirement", () => {
-    expect(ctx.appManifest.server_scripts[0]).toBe("_fxcompat/libs/oxmysql/MySQL.lua");
+    expect(ctx.appManifest.server_scripts).toEqual(["_fxcompat/run_server.lua"]);
+    expect(ctx.appLoader).toContain("_fxcompat/libs/oxmysql/MySQL.lua");
     expect(ctx.warnings.some((w) => w.includes("@oxmysql/lib/MySQL.lua") && w.includes("unsandboxed"))).toBe(true);
   });
 

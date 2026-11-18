@@ -97,8 +97,8 @@ describe("precompiled modules", () => {
     const read = (path: string): string => readFileSync(join(out, path), "utf8");
 
     expect(manifest.shared_scripts).toEqual(["_fxcompat/config.lua", "_fxcompat/init.lua", "_fxcompat/modules.lua"]);
-    expect(manifest.client_scripts).toEqual(["boot.lua"]);
-    expect(manifest.server_scripts).toEqual(["_fxcompat/modules_server.lua", "boot.lua"]);
+    expect(manifest.client_scripts).toEqual(["_fxcompat/run_client.lua"]);
+    expect(manifest.server_scripts).toEqual(["_fxcompat/modules_server.lua", "_fxcompat/run_server.lua"]);
     const clientListed = [...manifest.shared_scripts, ...(manifest.client_scripts ?? [])].map(read);
     for (const text of [...clientListed, read("imports/x/shared.lua"), read("imports/x/client.lua")]) {
       expect(text).not.toContain(SERVER_SECRET);

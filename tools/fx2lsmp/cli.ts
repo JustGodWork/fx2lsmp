@@ -2,8 +2,8 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync,
 import { basename, dirname, join, resolve } from "node:path";
 import { SKIP_DIRS, vendorImports } from "./imports.ts";
 import { buildJsShim } from "./jsShim.ts";
-import { COMPAT_LIBS, isJsScript, normalizeResourceName, normalizeUiPage, parseFxManifest, toLsmpManifest, usesLuaShim, SERVER_CONVARS_FILE, webuiFolder } from "./manifest.ts";
-import { collectModules, luaString, withoutRegisteredModules, writeModules } from "./modules.ts";
+import { COMPAT_LIBS, isJsScript, type FxManifest, type LsmpManifest, normalizeResourceName, normalizeUiPage, parseFxManifest, toLsmpManifest, usesLuaShim, SERVER_CONVARS_FILE, webuiFolder } from "./manifest.ts";
+import { collectModules, IMPORTS_DIR, LOADER_CLIENT_FILE, LOADER_SERVER_FILE, luaString, renderLoader, type ModuleEntry, withoutRegisteredModules, writeModules } from "./modules.ts";
 import { globToRegExp, listFiles, stageNui } from "./nui.ts";
 import { transpile } from "./transpile.ts";
 
@@ -225,6 +225,29 @@ function writeLua(from: string, dest: string, label: string, warnings: string[])
   writeFileSync(dest, result.code);
 }
 
+/** LS:MP expands manifest globs in alphabetical order; the loaders need the explicit list. */
+function expandScriptGlobs(fx: FxManifest, outDir: string): void {
+  const present = (existsSync(outDir) ? listFiles(outDir) : []).filter((file) => !file.startsWith("_fxcompat/") || file.startsWith(IMPORTS_DIR + "/"));
+  const expand = (list: readonly string[]): string[] =>
+    list.flatMap((entry) => (/[*?]/.test(entry) ? present.filter((file) => globToRegExp(entry).test(file)).sort() : [entry]));
+  fx.sharedScripts = expand(fx.sharedScripts);
+  fx.clientScripts = expand(fx.clientScripts);
+  fx.serverScripts = expand(fx.serverScripts);
+}
+
+function writeLoaders(outDir: string, fx: FxManifest, manifest: LsmpManifest): void {
+  const read = (scripts: readonly string[]): ModuleEntry[] =>
+    scripts.filter((s) => !isJsScript(s) && existsSync(join(outDir, s))).map((path) => ({ path, text: readFileSync(join(outDir, path), "utf8") }));
+  const write = (file: string, scripts: readonly string[]): void => {
+    if (![...(manifest.client_scripts ?? []), ...(manifest.server_scripts ?? [])].includes(file)) return;
+    const entries = read(scripts);
+    mkdirSync(join(outDir, "_fxcompat"), { recursive: true });
+    writeFileSync(join(outDir, file), renderLoader(entries, file));
+  };
+  write(LOADER_CLIENT_FILE, [...fx.sharedScripts, ...fx.clientScripts]);
+  write(LOADER_SERVER_FILE, [...fx.sharedScripts, ...fx.serverScripts]);
+}
+
 export async function convertResource(opts: ConvertOptions): Promise<ConvertResult> {
   const srcDir = resolve(opts.resourceDir);
   const outDir = resolve(opts.outDir);
@@ -273,7 +296,9 @@ export async function convertResource(opts: ConvertOptions): Promise<ConvertResu
   const registries = usesLuaShim(fx) ? collectModules(outDir, fx) : undefined;
   const modules = registries === undefined ? { client: false, server: false } : writeModules(outDir, registries);
   const shippedFiles = registries === undefined || opts.keepModuleText === true ? fx.files : withoutRegisteredModules(fx.files, outDir, registries);
-  const manifest = toLsmpManifest({ ...fx, files: shippedFiles }, name, modules);
+  const luaShim = registries !== undefined;
+  if (luaShim) expandScriptGlobs(fx, outDir);
+  const manifest = toLsmpManifest({ ...fx, files: shippedFiles }, name, modules, luaShim);
 
   const compatDir = opts.compatDir ?? resolve(import.meta.dirname, "../../compat");
   for (const key of fx.libs) {
@@ -287,6 +312,7 @@ export async function convertResource(opts: ConvertOptions): Promise<ConvertResu
     mkdirSync(dirname(join(outDir, lib.target)), { recursive: true });
     writeFileSync(join(outDir, lib.target), transpile(readFileSync(source, "utf8")).code);
   }
+  if (luaShim) writeLoaders(outDir, fx, manifest);
 
   let uiPage: string | undefined;
   if (fx.uiPage !== undefined) {

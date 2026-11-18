@@ -68,8 +68,11 @@ describe("cross-resource imports", () => {
     expect(warnings.some((w) => w.includes("cross-resource"))).toBe(false);
     expect(warnings.some((w) => w.includes("vendored resource 'xlib'") && w.includes("server-only file(s)"))).toBe(true);
     expect(manifest.shared_scripts).toEqual(["_fxcompat/config.lua", "_fxcompat/init.lua", "_fxcompat/modules.lua"]);
-    expect(manifest.client_scripts).toEqual([`${IMPORTS}/imports.lua`]);
-    expect(manifest.server_scripts).toEqual(["_fxcompat/modules_server.lua", `${IMPORTS}/imports.lua`, `${IMPORTS}/imports/s/server.lua`]);
+    expect(manifest.client_scripts).toEqual(["_fxcompat/run_client.lua"]);
+    expect(manifest.server_scripts).toEqual(["_fxcompat/modules_server.lua", "_fxcompat/run_server.lua"]);
+    expect(read("_fxcompat/run_client.lua")).toContain(`${IMPORTS}/imports.lua`);
+    expect(read("_fxcompat/run_client.lua")).not.toContain("S_LOADED");
+    expect(read("_fxcompat/run_server.lua")).toContain(`${IMPORTS}/imports/s/server.lua`);
     expect(manifest.files).toBeUndefined();
 
     const clientListed = [...manifest.shared_scripts, ...(manifest.client_scripts ?? [])];

@@ -6,6 +6,8 @@ import type { FxManifest } from "./manifest.ts";
 export const MODULES_FILE = "_fxcompat/modules.lua";
 export const IMPORTS_DIR = "_fxcompat/imports";
 export const MODULES_SERVER_FILE = "_fxcompat/modules_server.lua";
+export const LOADER_CLIENT_FILE = "_fxcompat/run_client.lua";
+export const LOADER_SERVER_FILE = "_fxcompat/run_server.lua";
 
 export function luaString(value: string): string {
   let out = '"';
@@ -55,6 +57,23 @@ export function renderModules(entries: readonly ModuleEntry[], file: string = MO
     return text;
   });
   return `local FXC <const> = { registerModule = __fxc_registry(${luaString(file)}) }\n${rendered.join("")}`;
+}
+
+/**
+ * One generated script per side holds the resource's own Lua scripts as separate functions and runs them in manifest
+ * order inside the one host coroutine LS:MP gives that file: LS:MP starts the next script file as soon as a body
+ * suspends (`lsmp.wait`, a pending `lsmp.call`), which FiveM's synchronous exports must not allow. Each entry records
+ * the line where its body starts so the shim can name the original file in an error.
+ */
+export function renderLoader(entries: readonly ModuleEntry[], file: string): string {
+  let before = 0;
+  const rendered = entries.map((entry) => {
+    const body = entry.text.replace(/^#![^\n]*/, "");
+    const text = `__fxc_script(${luaString(file)}, ${luaString(entry.path)}, function(...)\n${body}\nend, ${before + 2})\n`;
+    before += countLines(text);
+    return text;
+  });
+  return `${rendered.join("")}__fxc_run(${luaString(file)})\n`;
 }
 
 function walkLua(dir: string, rel = ""): string[] {
