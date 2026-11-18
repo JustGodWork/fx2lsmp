@@ -17,6 +17,10 @@ const LUA_FRAMEWORK = `
   end
   local ESX = { version = 'lua-1', Game = { Double = function(n) return n * 2 end } }
   ESX.GetPlayerFromId = function(src) return makePlayer(src) end
+  local Point = { kind = 'point' }
+  Point.__index = Point
+  function Point.describe() return 'a point' end
+  ESX.Point = setmetatable(Point, { __call = function(_, x) return setmetatable({ x = x }, Point) end })
   exports('getSharedObject', function() return ESX end)
   exports('many', function(n)
     local list = {}
@@ -102,6 +106,11 @@ describe("exported objects with methods, Lua consumer", () => {
       version: "js-1", id: "id2", before: 200, snapshot: 200, colon: 250, ok: true, dot: true,
       now: 260, fresh: 260, double: 8, label: "inv2", weight: 3,
     });
+  });
+
+  it("carries a self referencing class table with its functions", async () => {
+    const code = "local Point = exports.luafw:getSharedObject().Point return { Point.kind, Point.describe() }";
+    expect(await luaApp.server.eval(code)).toEqual(["point", "a point"]);
   });
 
   it("reports a missing method", async () => {

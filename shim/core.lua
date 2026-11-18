@@ -37,6 +37,7 @@
 ---@field run fun(file: string)
 ---@field vector2 fun(x?: number, y?: number): FxVector2
 ---@field vector4 fun(x?: number, y?: number, z?: number, w?: number): FxVector4
+---@field isVector fun(t: table): boolean
 local FXC <const> = {}
 
 ---@alias FxLoad fun(chunk: string, chunkname?: string, mode?: string, env?: table): (fun(...: any): ...)?, string?
@@ -261,6 +262,13 @@ do
     local make
     vec3mt, make = vectorType('vector3', { 'x', 'y', 'z' })
     vec3 = make
+  end
+
+  ---@param t table
+  ---@return boolean
+  function FXC.isVector(t)
+    local mt <const> = getmetatable(t)
+    return mt ~= nil and (mt == vec3mt or FLAT_VECTORS[mt] ~= nil)
   end
 
   vector3, vector2, vector4 = vec3, vec2, vec4

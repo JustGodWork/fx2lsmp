@@ -14,6 +14,7 @@ do
   local scan <const> = FXC.scan
   local SCAN_CLEAN <const>, SCAN_FUNCTIONS <const> = FXC.SCAN_CLEAN, FXC.SCAN_FUNCTIONS
   local encodeDirty <const> = FXC.encodeDirty
+  local isVector <const> = FXC.isVector
   local OBJECT_WINDOW <const> = 512
   local MAX_DEPTH <const> = 32
 
@@ -92,7 +93,8 @@ do
     return type(key) == 'string' or (mathType(key) == 'integer' and key >= 1)
   end
 
-  --- Copy of t without its functions; their key paths are appended to paths.
+  --- Copy of t without its functions; their key paths are appended to paths. Class tables are walked too: their
+  --- self reference (`Point.__index = Point`) is cut by `ancestors`.
   ---@param t table
   ---@param path (string|integer)[]
   ---@param depth integer
@@ -117,7 +119,7 @@ do
           own[depth] = k
           paths[#paths + 1] = own
         end
-      elseif kind == 'table' and getmetatable(e) == nil and isPathKey(k) then
+      elseif kind == 'table' and e ~= null and not isVector(e) and isPathKey(k) then
         if not ancestors[e] then
           path[depth] = k
           data[k] = split(e, path, depth + 1, paths, ancestors)
