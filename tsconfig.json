@@ -1,0 +1,1 @@
+{ "compilerOptions": { "target": "es2022", "module": "nodenext", "moduleResolution": "nodenext", "strict": true, "noUnusedLocals": true, "noUnusedParameters": true, "esModuleInterop": true, "skipLibCheck": true, "noEmit": true, "allowImportingTsExtensions": true, "types": ["node"], "resolveJsonModule": true }, "include": ["tools", "test", "shim/js"] }

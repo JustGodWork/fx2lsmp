@@ -1,0 +1,24 @@
+{
+  "name": "fxcompat",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "alias": "tsx tools/natives_alias.ts",
+    "fx2lsmp": "tsx tools/fx2lsmp/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "lint:lua": "tsx tools/lint-lua.ts",
+    "lsmp:smoke": "tsx tools/lsmp-smoke.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wasmoon": "^1.16.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
