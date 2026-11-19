@@ -46,7 +46,19 @@
   });
 
   var realFetch = typeof window.fetch === "function" ? window.fetch.bind(window) : null;
-  var prefix = "https://" + host.resource + "/";
+  // Pages pick the scheme from location.protocol: a rsc:// page is not https:, so they fall back to http://.
+  var prefixes = ["https://" + host.resource + "/", "http://" + host.resource + "/"];
+
+  /**
+   * @param {string} url
+   * @returns {string | null}
+   */
+  function callbackPath(url) {
+    for (var i = 0; i < prefixes.length; i++) {
+      if (url.indexOf(prefixes[i]) === 0) return url.slice(prefixes[i].length);
+    }
+    return null;
+  }
 
   /**
    * @param {unknown} input
@@ -75,12 +87,12 @@
   }
 
   window.fetch = function (input, init) {
-    var url = urlOf(input);
-    if (url.indexOf(prefix) !== 0) {
+    var path = callbackPath(urlOf(input));
+    if (path === null) {
       if (realFetch === null) return Promise.reject(new TypeError("fetch is not available"));
       return realFetch(input, init);
     }
-    var name = decodeURIComponent(url.slice(prefix.length).split("?")[0]);
+    var name = decodeURIComponent(path.split("?")[0]);
     var data = parseBody(init && init.body);
     return host.call(name, data).then(
       function (answer) {

@@ -55,6 +55,12 @@ describe("nui-prelude.js", () => {
     expect(result).toEqual([200, { ok: true, list: [1, 2] }]);
   });
 
+  it("routes http://<resource>/<name> too, the URL a rsc:// page builds from its non https protocol", async () => {
+    const { page, calls } = openPage(() => Promise.resolve("ok"));
+    expect(await page.run("fetch('http://myres/ready', { method: 'POST', body: '{}' }).then(function (r) { return r.json() })")).toBe("ok");
+    expect(calls).toEqual([{ event: "ready", args: [{}] }]);
+  });
+
   it("sends an empty object for a missing or invalid body", async () => {
     const { page, calls } = openPage(() => Promise.resolve(null));
     await page.run("fetch('https://myres/a')");
