@@ -140,6 +140,10 @@ describe("scripts as modules and CfxLua library helpers", () => {
   it("provides table.wipe and string.strsplit", async () => {
     world = await World.withShim({ resource: "unit", clients: 0 });
     expect(await world.server.eval("local t = { 1, 2, a = 3 } table.wipe(t) return next(t) == nil")).toBe(true);
+    expect(
+      await world.server.eval("local inner = {} local t = setmetatable({ 1, a = inner }, { __index = { b = 2 } }) local c = table.clone(t) return { c ~= t, c[1], c.a == inner, c.b }"),
+    ).toEqual([true, 1, true, 2]);
+    expect(await world.server.eval("return { string.strtrim('  ab c \\n'), string.strtrim('xxabx', 'x'), ('-a-'):strtrim('-') }")).toEqual(["ab c", "ab", "a"]);
     expect(await world.server.eval("return { string.strsplit(';', 'a;b;;c') }")).toEqual(["a", "b", "", "c"]);
     expect(await world.server.eval("return { string.strsplit(',;', 'a,b;c', 2) }")).toEqual(["a", "b;c"]);
   });

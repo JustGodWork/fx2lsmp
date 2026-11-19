@@ -314,6 +314,19 @@ do
     if not pcall(function() table.wipe = wipe end) then FXC.warnOnce('wipe', 'table.wipe could not be defined') end
   end
 
+  if table.clone == nil then
+    --- Shallow copy that keeps the metatable, like CfxLua's (borrowed from Luau).
+    ---@generic T: table
+    ---@param t T
+    ---@return T
+    local function clone(t)
+      local out <const> = {}
+      for key, value in next, t do out[key] = value end
+      return setmetatable(out, getmetatable(t))
+    end
+    if not pcall(function() table.clone = clone end) then FXC.warnOnce('clone', 'table.clone could not be defined') end
+  end
+
   if string.strsplit == nil then
     --- WoW style split: every character of `delimiter` separates, empty pieces are kept, `pieces` caps the count.
     ---@param delimiter string
@@ -335,6 +348,19 @@ do
       return table.unpack(out)
     end
     if not pcall(function() string.strsplit = strsplit end) then FXC.warnOnce('strsplit', 'string.strsplit could not be defined') end
+  end
+
+  if string.strtrim == nil then
+    --- WoW style trim: strips any character of `chars` (default whitespace) from both ends.
+    ---@param text string
+    ---@param chars? string
+    ---@return string
+    local function strtrim(text, chars)
+      local set <const> = '[' .. string.gsub(chars or ' \t\r\n', '[%^%]%-%%]', '%%%0') .. ']'
+      local trimmed <const> = string.gsub(string.gsub(text, '^' .. set .. '+', ''), set .. '+$', '')
+      return trimmed
+    end
+    if not pcall(function() string.strtrim = strtrim end) then FXC.warnOnce('strtrim', 'string.strtrim could not be defined') end
   end
 
   ---@param t table
