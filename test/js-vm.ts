@@ -48,6 +48,9 @@ export interface NativeCall {
   args: unknown[];
 }
 
+/** LS:MP default RPC deadline (docs/raw/sdk.md, RPC rules). */
+const RPC_TIMEOUT_MS = 10000;
+
 const ENGINE_NAMES: ReadonlySet<string> = new Set([
   "playerJoin", "playerLeave", "playerDeath", "playerSpawn", "resourceStart", "resourceStop", "metaChange",
   "serverStart", "serverStop", "playerPreConnection", "playerDimensionChange", "entityOwnerChange",
@@ -272,10 +275,12 @@ export class JsVm implements SimVm {
     this.later.push(fn);
   }
 
-  pendingCall(start: (id: number) => void): Promise<unknown> {
+  /** With a deadline, the call fails with `timeout` then, as LS:MP RPCs do, and a late answer is dropped. */
+  pendingCall(start: (id: number) => void, timeoutMs?: number): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = ++this.lastPending;
       this.pending.set(id, { resolve, reject });
+      if (timeoutMs !== undefined) this.addTimer(() => this.settle(id, null, "timeout"), timeoutMs, [], null);
       start(id);
     });
   }
@@ -335,7 +340,7 @@ export class JsVm implements SimVm {
         this.calls.set(name, fn);
         return () => this.calls.delete(name);
       },
-      call: (nameOrOpts: string | { name: string }, ...args: unknown[]) => {
+      call: (nameOrOpts: string | { name: string; timeoutMs?: number }, ...args: unknown[]) => {
         const name = checkNet("lsmp.call", typeof nameOrOpts === "string" ? nameOrOpts : nameOrOpts.name);
         const wire = toWire("lsmp.call", args);
         return this.pendingCall((id) =>
@@ -350,6 +355,7 @@ export class JsVm implements SimVm {
               err === undefined ? this.settle(id, reply === undefined ? null : fromWire(reply)) : this.settle(id, null, err),
             );
           }),
+          typeof nameOrOpts === "string" ? RPC_TIMEOUT_MS : (nameOrOpts.timeoutMs ?? RPC_TIMEOUT_MS),
         );
       },
       wait: (ms?: number) =>
@@ -459,6 +465,7 @@ export class JsVm implements SimVm {
       callServer: (name: string, ...args: unknown[]) =>
         this.pendingCall((id) =>
           this.send({ to: "s", from: this.id ?? 0, ret: this.key, kind: "call", id, name: checkNet("lsmp.callServer", name), wire: toWire("lsmp.callServer", args) }),
+          RPC_TIMEOUT_MS,
         ),
       getLocalPlayer: () => this.id,
       getEntityOwner: (netId: number) => this.owners.get(netId) ?? null,
@@ -504,6 +511,7 @@ export class JsVm implements SimVm {
       callClient: (target: number, name: string, ...args: unknown[]) =>
         this.pendingCall((id) =>
           this.send({ to: `c${target}`, ret: this.key, kind: "call", id, name: checkNet("lsmp.callClient", name), wire: toWire("lsmp.callClient", args) }),
+          RPC_TIMEOUT_MS,
         ),
       getPlayerName: (id: number) => this.players.get(id)?.name ?? null,
       getPlayerLsmpId: (id: number) => this.players.get(id)?.lsmpId ?? null,

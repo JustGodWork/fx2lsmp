@@ -8,6 +8,8 @@ type ExportFn = (...args: unknown[]) => unknown;
 
 
 const CALLBACK_WINDOW = 512;
+// FiveM exports have no deadline and ESX callbacks wait on fades and spawns: LS:MP's 10 s default cuts them
+const EXPORT_TIMEOUT_MS = 300000;
 const marker = invokerMarker(resource);
 
 const callbacks = new Map<number, ExportFn>();
@@ -254,7 +256,7 @@ function failure(error: unknown, name: string, target: string): Error {
 export async function callExport(target: string, name: string, ...args: unknown[]): Promise<unknown> {
   let list: unknown;
   try {
-    list = await host.call(exportEvent(target, name), marker, ...encodeArgs(liftArgs(args), dropped));
+    list = await host.call({ name: exportEvent(target, name), timeoutMs: EXPORT_TIMEOUT_MS }, marker, ...encodeArgs(liftArgs(args), dropped));
   } catch (error) {
     throw failure(error, name, target);
   }

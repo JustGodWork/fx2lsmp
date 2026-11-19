@@ -23,6 +23,25 @@ do
   ---@return string
   local function rpcName(resource, name) return 'export:' .. resource .. ':' .. name end
 
+  -- FiveM exports have no deadline and ESX callbacks wait on fades and spawns: LS:MP's 10 s default cuts them.
+  local EXPORT_TIMEOUT_MS <const> = 300000
+
+  ---@type table<string, { name: string, timeoutMs: integer }>
+  local callOptions <const> = {}
+
+  ---@param resource string
+  ---@param name string
+  ---@return { name: string, timeoutMs: integer }
+  local function callOptionsOf(resource, name)
+    local rpc <const> = rpcName(resource, name)
+    local opts = callOptions[rpc]
+    if opts == nil then
+      opts = { name = rpc, timeoutMs = EXPORT_TIMEOUT_MS }
+      callOptions[rpc] = opts
+    end
+    return opts
+  end
+
   ---@type fun(resource: string, name: string, fn: fun(...: any): ...)
   local register
   ---@type fun(resource: string, name: string, ...: any): ...
@@ -339,7 +358,7 @@ do
   end
 
   function callExport(resource, name, ...)
-    local list, err = lsmp.call(rpcName(resource, name), FXC.invokerMarker, prepareArgs(...))
+    local list, err = lsmp.call(callOptionsOf(resource, name), FXC.invokerMarker, prepareArgs(...))
     if err ~= nil then
       if err == 'no-handler' then
         error(("export '%s' of resource '%s' is not available"):format(name, resource), 3)

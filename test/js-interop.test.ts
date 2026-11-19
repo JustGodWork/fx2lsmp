@@ -6,6 +6,7 @@ const LUA_SERVER = `
   exports('luaSparse', function(t) return { [5] = t[7], list = { 1, 2 } } end)
   exports('luaCall', function(cb) return cb(5) + 1 end)
   exports('luaBoom', function() error('kaboom') end)
+  exports('luaSlow', function() Wait(15000) return 'slow' end)
   exports('luaVec2', function() return vector2(1.5, 2.5) end)
   RegisterNetEvent('lua:net', function(p) LUA_NET = { source, p } end)
   AddEventHandler('lua:local', function(p) LUA_LOCAL = p end)
@@ -21,6 +22,7 @@ const JS_SERVER = `
   exports('jsVec', () => ({ x: 1, y: 2, z: 3 }));
   exports('jsEcho', (v) => v);
   exports('withCb', async (cb) => (await cb(21)) + 1);
+  exports('jsSlow', async () => { await Wait(15000); return 'slow'; });
   onNet('js:net', (p) => { globalThis.JS_NET = [source, p]; });
   on('js:local', (p) => { globalThis.JS_LOCAL = p; });
 `;
@@ -70,6 +72,14 @@ describe("exports, Lua and JS in both directions", () => {
   it("function references call back across languages", async () => {
     expect(await luaServer().eval("return exports.jsres:withCb(function(n) return n * 2 end)")).toBe(43);
     expect(await js.server.eval("return await exports.luares.luaCall((n) => n * 3)")).toBe(16);
+  });
+
+  it("waits for exports and callbacks that outlast the LS:MP default call deadline", async () => {
+    js.server.load("slow.js", "(async () => { globalThis.SLOW = [await exports.luares.luaSlow(), await exports.luares.luaCall(async (n) => { await Wait(15000); return n * 3; })]; })();");
+    luaServer().load("slow.lua", "CreateThread(function() SLOW = { exports.jsres:jsSlow(), exports.jsres:withCb(function(n) Wait(15000) return n * 2 end) } end)");
+    await world.advance(32000);
+    expect(await js.server.eval("return globalThis.SLOW")).toEqual(["slow", 16]);
+    expect(await luaServer().eval("return SLOW")).toEqual(["slow", 43]);
   });
 
   it("failures and missing exports raise in the caller", async () => {

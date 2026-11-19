@@ -462,12 +462,22 @@ end
 
 local function nameOf(opts) return type(opts) == 'table' and opts.name or opts end
 
+--- LS:MP answers `timeout` at the deadline (10 s unless `timeoutMs` is given) and drops a late answer.
+---@param id integer
+---@param opts string|{ name: string, timeoutMs: integer? }
+local function armDeadline(id, opts)
+  seq = seq + 1
+  local ms <const> = type(opts) == 'table' and opts.timeoutMs or 10000
+  timers[#timers + 1] = { at = now + ms, fn = function() settle(id, nil, 'timeout') end, args = table.pack(), seq = seq }
+end
+
 function lsmp.call(nameOrOpts, ...)
   local name = nameOf(nameOrOpts)
   checkNet('lsmp.call', name)
   local cb, args = splitCallback(...)
   local wire = wireArgs('lsmp.call', table.unpack(args, 1, args.n))
   return suspendOrCallback('lsmp.call', cb, function(id)
+    armDeadline(id, nameOrOpts)
     later(function()
       local handler = calls[name]
       if handler == nil and PEERS then
@@ -488,6 +498,7 @@ local function networkCall(fnName, to, nameOrOpts, ...)
   local cb, args = splitCallback(...)
   local wire = wireArgs(fnName, table.unpack(args, 1, args.n))
   return suspendOrCallback(fnName, cb, function(id)
+    armDeadline(id, nameOrOpts)
     send({ to = to, from = LOCAL_ID, ret = KEY, kind = 'call', id = id, name = name, wire = wire })
   end)
 end

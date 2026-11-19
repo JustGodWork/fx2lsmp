@@ -92,7 +92,7 @@
 ---@field emitAllClients fun(name: string, ...: any): integer
 ---@field onClient fun(name: string, fn: fun(source: integer, ...: any)): fun(): boolean
 ---@field onCall fun(name: string, fn: fun(...: any): any): fun(): boolean
----@field call fun(name: string, ...: any): any, string?, any
+---@field call fun(name: string|{ name: string, timeoutMs: integer? }, ...: any): any, string?, any
 ---@field wait fun(ms: integer)
 ---@field createThread fun(fn: fun(...: any), ...: any)
 ---@field onTick fun(fn: fun(dtMs: integer)): fun(): boolean
