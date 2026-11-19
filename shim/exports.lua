@@ -296,6 +296,7 @@ do
     local tag = v[MARK]
     if tag == 'fn' and type(v.r) == 'string' and math.type(v.id) == 'integer' then
       local resource, id = v.r, v.id
+      if resource == FXC.resource and callbacks[id] ~= nil then return callbacks[id] end
       return function(...) return callExport(resource, CALLBACK, id, ...) end
     end
     if tag == 'obj' and type(v.r) == 'string' and math.type(v.id) == 'integer' then return rebuildObject(v, depth) end
@@ -328,6 +329,7 @@ do
     if not changed then return ... end
     return table.unpack(args, 1, n)
   end
+  FXC.unliftArgs = unliftArgs
 
   ---@param n integer
   ---@param ... any

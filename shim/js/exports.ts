@@ -153,7 +153,7 @@ function liftValue(value: unknown): unknown {
   return value;
 }
 
-function liftArgs(args: unknown[]): unknown[] {
+export function liftArgs(args: unknown[]): unknown[] {
   return args.map(liftValue);
 }
 
@@ -217,7 +217,10 @@ function unlift(value: unknown, depth: number): unknown {
     return out ?? value;
   }
   if (!isBag(value)) return value;
-  if (isFnRef(value)) return (...args: unknown[]) => callExport(value.r, CALLBACK_EXPORT, value.id, ...args);
+  if (isFnRef(value)) {
+    const own = value.r === resource ? callbacks.get(value.id) : undefined;
+    return own ?? ((...args: unknown[]) => callExport(value.r, CALLBACK_EXPORT, value.id, ...args));
+  }
   if (isObjRef(value)) return rebuild(value, depth);
   if (depth > MAX_PATH) return value;
   let out: Bag | undefined;
@@ -229,6 +232,10 @@ function unlift(value: unknown, depth: number): unknown {
     }
   }
   return out ?? value;
+}
+
+export function unliftArgs(args: unknown[]): unknown[] {
+  return args.map((a) => unlift(a, 1));
 }
 
 function pack(value: unknown): unknown[] {

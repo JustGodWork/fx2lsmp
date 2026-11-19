@@ -1,4 +1,5 @@
 import { NUI_CALLBACK_PREFIX, SERVER_SOURCE, decodeArgs, encodeArgs, invokerMarker, isRecord, isThenable, splitInvoker } from "./protocol.ts";
+import { liftArgs, unliftArgs } from "./exports.ts";
 import { runAs } from "./invoker.ts";
 import { clientHost, config, dropped, expose, host, logError, resource, serverHost, side, toFiveM, toLsmp, warnOnce } from "./runtime.ts";
 
@@ -117,7 +118,7 @@ function subscribeLocal(name: string): void {
   if (route === undefined) {
     host.on(name, (...wire) => {
       const { invoker, args } = splitInvoker(wire);
-      dispatch(name, invoker, null, decodeArgs(args));
+      dispatch(name, invoker, null, unliftArgs(decodeArgs(args)));
     });
     return;
   }
@@ -174,7 +175,8 @@ export function RegisterNetEvent(name: string, fn?: Handler): EventHandle | unde
 
 export function TriggerEvent(name: string, ...args: unknown[]): void {
   if (ENGINE.has(name)) return dispatch(name, resource, null, args);
-  host.emit(name, marker, ...encodeArgs(args, dropped));
+  // functions travel as references, as in FiveM, where a local event can carry a callback to another resource
+  host.emit(name, marker, ...encodeArgs(liftArgs(args), dropped));
 }
 
 interface ChatLine {

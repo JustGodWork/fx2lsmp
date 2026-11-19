@@ -146,7 +146,7 @@ do
   ---@param name string
   ---@param invoker string?
   ---@param ... any
-  local function dispatchLocal(name, invoker, ...) return dispatch(name, invoker, nil, decodeArgs(...)) end
+  local function dispatchLocal(name, invoker, ...) return dispatch(name, invoker, nil, FXC.unliftArgs(decodeArgs(...))) end
 
   --- Runs the handlers in this VM with the arguments as they are: functions survive, unlike a TriggerEvent payload.
   ---@param name string
@@ -222,7 +222,8 @@ do
   ---@param ... any
   function TriggerEvent(name, ...)
     if ENGINE[name] ~= nil then return dispatch(name, FXC.resource, nil, ...) end
-    lsmp.emit(name, FXC.invokerMarker, encodeArgs(...))
+    -- functions travel as references, as in FiveM, where a local event can carry a callback to another resource
+    lsmp.emit(name, FXC.invokerMarker, FXC.prepareArgs(...))
   end
 
   ---@param name string
