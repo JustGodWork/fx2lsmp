@@ -400,6 +400,17 @@ describe("server functions", () => {
 });
 
 describe("client natives", () => {
+  it("passes false for the resource scope flags LS:MP rejects", async () => {
+    await first.eval(`
+      globalThis.SCOPE = {};
+      globalThis.destroyCam = (cam, flag) => { SCOPE.cam = [cam, flag]; };
+      globalThis.destroyAllCams = (flag) => { SCOPE.all = flag; };
+      globalThis.setEntityAsMissionEntity = (e, a, b) => { SCOPE.mission = [e, a, b]; };
+    `);
+    await first.eval("DestroyCam(7, true); DestroyAllCams(true); SetEntityAsMissionEntity(9, true, true);");
+    expect(await first.eval("return [SCOPE.cam, SCOPE.all, SCOPE.mission, SendNuiMessage === SendNUIMessage]")).toEqual([[7, false], false, [9, true, false], true]);
+  });
+
   it("resolves PascalCase names, returns vectors as arrays and keeps the camelCase natives", async () => {
     expect(await first.eval("return [PlayerPedId(), GetEntityCoords(PlayerPedId()), getEntityCoords(1), GetGameTimer() > 0]")).toEqual([
       500,

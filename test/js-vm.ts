@@ -169,6 +169,7 @@ export class JsVm implements SimVm {
   readonly context: Context;
   readonly natives: NativeCall[] = [];
   readonly kicks: { id: number; reason: string | undefined }[] = [];
+  readonly spawns: { x: number; y: number; z: number; heading: number | undefined }[] = [];
   readonly files = new Map<string, string>();
   readonly httpRequests: unknown[] = [];
   readonly grants = new Map<number, Set<string>>();
@@ -468,6 +469,11 @@ export class JsVm implements SimVm {
           RPC_TIMEOUT_MS,
         ),
       getLocalPlayer: () => this.id,
+      spawn: (pos: { x: number; y: number; z: number }, opts?: { heading?: number }) => {
+        this.spawns.push({ x: pos.x, y: pos.y, z: pos.z, heading: opts?.heading });
+        for (const fn of [...(this.listeners.get("playerSpawn") ?? [])]) this.invoke(fn, [this.id, pos, opts?.heading ?? 0, null, this.spawns.length === 1]);
+        return true;
+      },
       getEntityOwner: (netId: number) => this.owners.get(netId) ?? null,
       getEntityFromNetId: (netId: number) => netId + 10000,
       getNetIdFromEntity: (handle: number) => (handle > 10000 ? handle - 10000 : null),

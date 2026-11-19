@@ -215,6 +215,38 @@ if FXC.side == 'client' then
   -- Raises "disabled by LSMP script policy" under LS:MP, which would kill the calling thread.
   function ShutdownLoadingScreen() end
 
+  -- LS:MP keeps the local ped hidden until lsmp.spawn: a framework that spawns with this native (ESX) needs it once.
+  local localSpawned = false
+  lsmp.on('playerSpawn', function() localSpawned = true end)
+
+  ---@param x number
+  ---@param y number
+  ---@param z number
+  ---@param heading number
+  ---@param ... any
+  function NetworkResurrectLocalPlayer(x, y, z, heading, ...)
+    if not localSpawned then
+      lsmp.spawn({ x = x, y = y, z = z }, { heading = heading or 0.0 })
+      return
+    end
+    return G.networkResurrectLocalPlayer(x, y, z, heading, ...)
+  end
+
+  -- LS:MP raises on a nonzero resource scope flag, which FiveM scripts commonly pass.
+  ---@param cam integer
+  ---@param _scriptHostCam? boolean
+  function DestroyCam(cam, _scriptHostCam) return G.destroyCam(cam, false) end
+
+  ---@param _scriptHostCam? boolean
+  function DestroyAllCams(_scriptHostCam) return G.destroyAllCams(false) end
+
+  ---@param entity integer
+  ---@param scriptHostObject boolean
+  ---@param _grabFromOtherScript? boolean
+  function SetEntityAsMissionEntity(entity, scriptHostObject, _grabFromOtherScript)
+    return G.setEntityAsMissionEntity(entity, scriptHostObject, false)
+  end
+
   ---@type table<string, string>
   local POLICY_NOOPS <const> = {
     SetNetworkIdCanMigrate = 'LS:MP owns network migration',
@@ -291,6 +323,7 @@ if FXC.side == 'client' then
     if b == nil then return false end
     return b:emit('__fxnui', FXC.toJson(data))
   end
+  SendNuiMessage = SendNUIMessage
 
   ---@param name string
   ---@param fn fun(data: any, cb: fun(response?: any, error?: any))

@@ -86,6 +86,23 @@ function installPlayers(client: LsmpClient): void {
   expose("NetworkIsSessionStarted", () => client.getLocalPlayer() !== null);
   // these raise "disabled by LSMP script policy" under LS:MP, which would abort the calling script
   expose("ShutdownLoadingScreen", () => undefined);
+  // LS:MP keeps the local ped hidden until spawn(): a framework that spawns with this native (ESX) needs it once
+  let localSpawned = false;
+  client.on("playerSpawn", () => {
+    localSpawned = true;
+  });
+  const resurrect = native("networkResurrectLocalPlayer");
+  expose("NetworkResurrectLocalPlayer", (x: number, y: number, z: number, heading: number, ...rest: unknown[]) => {
+    if (!localSpawned) return void client.spawn({ x, y, z }, { heading: heading ?? 0 });
+    return resurrect(x, y, z, heading, ...rest);
+  });
+  // LS:MP raises on a nonzero resource scope flag, which FiveM scripts commonly pass
+  const destroyCam = native("destroyCam");
+  const destroyAllCams = native("destroyAllCams");
+  const setMission = native("setEntityAsMissionEntity");
+  expose("DestroyCam", (cam: number) => destroyCam(cam, false));
+  expose("DestroyAllCams", () => destroyAllCams(false));
+  expose("SetEntityAsMissionEntity", (entity: number, scriptHostObject: boolean) => setMission(entity, scriptHostObject, false));
   for (const [name, reason] of Object.entries(POLICY_NOOPS)) {
     expose(name, () => warnOnce(`policy:${name}`, `${name} is blocked by the LS:MP script policy (${reason}): the call does nothing`));
   }
@@ -154,7 +171,9 @@ function installNui(client: LsmpClient): void {
       });
     });
   });
-  expose("SendNUIMessage", (data: unknown) => nuiBrowser(client)?.emit(NUI_EVENT, toJson(data)) ?? false);
+  const sendMessage = (data: unknown): boolean => nuiBrowser(client)?.emit(NUI_EVENT, toJson(data)) ?? false;
+  expose("SendNUIMessage", sendMessage);
+  expose("SendNuiMessage", sendMessage);
   const applyFocus = (): void => {
     const b = nuiBrowser(client);
     if (b === null) return;

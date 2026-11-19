@@ -116,6 +116,7 @@ interface LsmpClient extends LsmpShared {
   emitServer(name: string, ...args: LsmpValue[]): boolean;
   onServer(name: string, fn: (...args: LsmpValue[]) => unknown): () => boolean;
   getLocalPlayer(): number | null;
+  spawn(position: { x: number; y: number; z: number }, opts?: { heading?: number; model?: number | string }): boolean;
   getNetIdFromEntity(handle: number): number | null;
   getEntityFromNetId(netId: number): number | null;
   onTick(fn: (dt: number) => unknown): () => boolean;

@@ -76,6 +76,29 @@ describe("player ids", () => {
     expect(await client().eval("return { NetworkDoesNetworkIdExist(5), NetworkDoesEntityExistWithNetworkId(5), NetworkGetEntityIsNetworked(10005), NetworkGetEntityIsNetworked(3), NetworkIsSessionStarted() }")).toEqual([true, true, true, false, true]);
   });
 
+  it("spawns through LS:MP on the first NetworkResurrectLocalPlayer, then resurrects", async () => {
+    const c = client();
+    c.load("resurrect.lua", "RESURRECTS = {} networkResurrectLocalPlayer = function(...) RESURRECTS[#RESURRECTS + 1] = { ... } end");
+    const before = await c.eval("return #lsmp.__test.spawns");
+    await c.eval("NetworkResurrectLocalPlayer(1.0, 2.0, 3.0, 90.0, 0, true)");
+    expect(await c.eval(`local s = lsmp.__test.spawns[${Number(before) + 1}] return { s.pos.x, s.pos.z, s.opts.heading, #RESURRECTS }`)).toEqual([1, 3, 90, 0]);
+    await c.eval("NetworkResurrectLocalPlayer(4.0, 5.0, 6.0, 0.0, 0, true)");
+    expect(await c.eval("return { #lsmp.__test.spawns, RESURRECTS[1][1] }")).toEqual([Number(before) + 1, 4]);
+  });
+
+  it("passes false for the resource scope flags LS:MP rejects", async () => {
+    const c = client();
+    c.load("scope.lua", `
+      SCOPE = {}
+      destroyCam = function(cam, flag) SCOPE.cam = { cam, flag } end
+      destroyAllCams = function(flag) SCOPE.all = flag end
+      setEntityAsMissionEntity = function(e, a, b) SCOPE.mission = { e, a, b } end
+    `);
+    await c.eval("DestroyCam(7, true) DestroyAllCams(true) SetEntityAsMissionEntity(9, true, true)");
+    expect(await c.eval("return { SCOPE.cam, SCOPE.all, SCOPE.mission }")).toEqual([[7, false], false, [9, true, false]]);
+    expect(await c.eval("return SendNuiMessage == SendNUIMessage")).toBe(true);
+  });
+
   it("turns natives blocked by the LS:MP policy into no-ops that warn once", async () => {
     const c = client();
     expect(await c.eval("ShutdownLoadingScreen(); SetNetworkIdCanMigrate(1, true); SetWeatherTypeNow('CLEAR'); SetWeatherTypeNow('RAIN'); return 1")).toBe(1);

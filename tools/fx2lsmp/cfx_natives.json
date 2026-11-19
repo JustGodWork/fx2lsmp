@@ -655,7 +655,7 @@
     "SendDuiMouseUp": {"apiset":"client","result":"void","covered":[]},
     "SendDuiMouseWheel": {"apiset":"client","result":"void","covered":[]},
     "SendLoadingScreenMessage": {"apiset":"client","result":"BOOL","covered":[]},
-    "SendNuiMessage": {"apiset":"client","result":"BOOL","covered":[]},
+    "SendNuiMessage": {"apiset":"client","result":"BOOL","covered":["lua.client","js.client"]},
     "SetAimCooldown": {"apiset":"client","result":"void","covered":[]},
     "SetAudioSubmixEffectParamFloat": {"apiset":"client","result":"void","covered":[]},
     "SetAudioSubmixEffectParamInt": {"apiset":"client","result":"void","covered":[]},
